@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const slotDate = new Date(info.event.start).toLocaleDateString();
                 const slotTime = new Date(info.event.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const slotEnd = new Date(info.event.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
+                const slotPrice = info.event.extendedProps.price; 
                 // Show SweetAlert2 popup
                 Swal.fire({
                     title: 'Slot Details',
@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <p><strong>Date:</strong> ${slotDate}</p>
                         <p><strong>Time:</strong> ${slotTime} - ${slotEnd}</p>
                         <p><strong>Status:</strong> ${slotStatus}</p>
+                        <p><strong>Price:</strong> RM ${slotPrice}</p>
                     `,
                     icon: slotStatus === 'available' ? 'success' : 'error',
                     showCancelButton: slotStatus === 'available',

@@ -185,39 +185,52 @@ class BookingController extends Controller
      * Helper: Generate default slots for a given field and date.
      */
     private function generateSlots($fieldID, $date)
-    {
-        $defaultTimes = [
-            '08:00:00', '10:00:00', '12:00:00', '14:00:00',
-            '16:00:00', '18:00:00', '20:00:00', '22:00:00'
-        ];
+{
+    $defaultTimes = [
+        '08:00:00', '10:00:00', '12:00:00', '14:00:00',
+        '16:00:00', '18:00:00', '20:00:00', '22:00:00'
+    ];
 
-        $slots = [];
-        foreach ($defaultTimes as $time) {
-            // Decide price based on time range
-            $hour = intval(substr($time, 0, 2)); // get hour as int
+    $field = Field::find($fieldID); // ✅ get field details
 
+    $slots = [];
+    foreach ($defaultTimes as $time) {
+        $hour = intval(substr($time, 0, 2)); // extract hour
+
+        // ✅ Mini field pricing
+        if ($field && $field->field_Size === "MINI SIZED FOOTBALL PITCH(9'S)") {
             if ($hour >= 8 && $hour < 16) {
-                $price = 450; // 8AM - 4PM
-            } elseif ($hour >= 16 && $hour < 20) {
-                $price = 500; // 4PM - 8PM
+                $price = 350; // Morning till 4PM
             } else {
-                $price = 550; // After 8PM
+                $price = 400; // After 4PM
             }
-
-            $slot = Slot::create([
-                'slotID'     => uniqid('SLOT'),
-                'slot_Date'  => $date,
-                'slot_Time'  => $time,
-                'slot_Price' => $price,
-                'fieldID'    => $fieldID,
-                'slot_Status'=> 'available',
-            ]);
-
-            $slots[] = $slot;
+        } 
+        // ✅ Standard field pricing (unchanged - 3 different prices)
+        else {
+            if ($hour >= 8 && $hour < 16) {
+                $price = 450; 
+            } elseif ($hour >= 16 && $hour < 20) {
+                $price = 500;
+            } else {
+                $price = 550;
+            }
         }
 
-        return collect($slots);
+        $slot = Slot::create([
+            'slotID'     => uniqid('SLOT'),
+            'slot_Date'  => $date,
+            'slot_Time'  => $time,
+            'slot_Price' => $price,
+            'fieldID'    => $fieldID,
+            'slot_Status'=> 'available',
+        ]);
+
+        $slots[] = $slot;
     }
+
+    return collect($slots);
+}
+
 
     /**
      * Helper: Add 2 hours to a time string (HH:MM:SS).
@@ -333,14 +346,48 @@ class BookingController extends Controller
    public function viewBookings()
 {
     $userId = session('user_id');
-    
 
-    $bookings = Booking::with('slot')
+    $bookings = Booking::with(['slot', 'field'])
         ->where('userID', $userId)
-        ->get();
+        ->where('booking_Status', 'paid')
+        ->get()
+        ->map(function ($booking) {
+            $slotDateTime = null;
+
+            if ($booking->slot && $booking->slot->slot_Date) {
+                if (!empty($booking->slot->slot_Time)) {
+                    // Case 1: single time
+                    $slotDateTime = Carbon::parse($booking->slot->slot_Date . ' ' . $booking->slot->slot_Time);
+                } elseif (!empty($booking->slot->slot_EndTime)) {
+                    // Case 2: time range, use end time
+                    $slotDateTime = Carbon::parse($booking->slot->slot_Date . ' ' . $booking->slot->slot_EndTime);
+                } else {
+                    // Case 3: fallback end of day
+                    $slotDateTime = Carbon::parse($booking->slot->slot_Date)->endOfDay();
+                }
+            }
+
+            // Attach custom attributes for blade
+            $booking->isExpired = $slotDateTime ? $slotDateTime->lt(Carbon::now()) : false;
+            $booking->formattedDate = $booking->slot && $booking->slot->slot_Date
+                ? Carbon::parse($booking->slot->slot_Date)->format('d M Y')
+                : 'Not available';
+            $booking->formattedTime = $booking->slot && !empty($booking->slot->slot_Time)
+                ? $booking->slot->slot_Time
+                : (($booking->slot && $booking->slot->slot_StartTime && $booking->slot->slot_EndTime)
+                    ? Carbon::parse($booking->slot->slot_StartTime)->format('h:i A') . ' - ' .
+                      Carbon::parse($booking->slot->slot_EndTime)->format('h:i A')
+                    : 'Not available');
+            $booking->formattedPrice = $booking->slot && $booking->slot->slot_Price
+                ? 'RM ' . number_format($booking->slot->slot_Price, 2)
+                : 'Not available';
+
+            return $booking;
+        });
 
     return view('booking.customer.viewBooking', compact('bookings'));
 }
+
 
 
 
