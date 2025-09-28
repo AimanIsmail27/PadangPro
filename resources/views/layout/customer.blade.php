@@ -16,7 +16,7 @@
         /* Sidebar */
         aside {
             width: 220px;
-            background: white;
+            background: white; /* keep white */
             color: #000;
             height: 100vh;
             display: flex;
@@ -44,11 +44,49 @@
             font-weight: 500;
         }
 
-        aside nav ul li:hover {
-            background: rgba(255, 255, 255, 0.3);
+        aside nav ul li a {
+            color: #000;
+            text-decoration: none;
+            display: block;
+            transition: all 0.3s ease;
+        }
+
+        aside nav ul li a:hover {
+            background: #1E2A78; /* blue hover */
+            color: white;
             border-radius: 8px;
             padding-left: 10px;
-            transition: 0.3s;
+        }
+
+        /* Dropdown items */
+        .nav-item .dropdown-menu {
+            display: none;
+            position: relative;
+            margin-left: 15px;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            padding-left: 10px;
+        }
+
+        .nav-item.dropdown:hover > .dropdown-menu {
+            display: block;
+        }
+
+        .nav-item .dropdown-menu .dropdown-item {
+            white-space: nowrap;
+            color: #000;
+            display: block;
+            padding: 8px 0;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item .dropdown-menu .dropdown-item:hover {
+            background: #1E2A78;
+            color: white;
+            border-radius: 6px;
+            padding-left: 8px;
         }
 
         /* Main Content */
@@ -61,7 +99,7 @@
         /* Topbar */
         .topbar {
             display: flex;
-            justify-content: flex-end; /* pushes to the right */
+            justify-content: flex-end;
             align-items: center;
             margin-bottom: 20px;
         }
@@ -78,32 +116,6 @@
             width: 100%;
             box-sizing: border-box;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Hide submenu by default */
-        .nav-item .dropdown-menu {
-            display: none;
-            position: relative;
-            margin-left: 15px;
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            padding-left: 10px;
-        }
-
-        /* Show submenu when hovering */
-        .nav-item.dropdown:hover > .dropdown-menu {
-            display: block;
-        }
-
-        .nav-item .dropdown-menu .dropdown-item {
-            white-space: nowrap;
-        }
-
-        .nav-item .dropdown-menu .dropdown-item:hover {
-            background: rgba(0, 0, 0, 0.05);
-            border-radius: 6px;
-            padding-left: 8px;
         }
     </style>
 </head>
@@ -123,7 +135,7 @@
                         <li><a class="dropdown-item" href="{{ route('booking.mini') }}">Book Mini Pitch</a></li>
                     </ul>
                 </li>
-                <li class="nav-item">Rental</li>
+                <li class="nav-item"><a href="{{ route('customer.rental.main') }}">Rental Item</a></li>
                 <li class="nav-item">Matchmaking</li>
                 <li class="nav-item">Rating and Review</li>
                 <li class="nav-item"><a href="{{ route('logout') }}">Logout</a></li>

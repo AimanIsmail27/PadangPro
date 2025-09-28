@@ -18,6 +18,9 @@ class Rental extends Model
     // Disable timestamps
     public $timestamps = false;
 
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     // Columns that can be mass assigned
     protected $fillable = [
         'rentalID',
@@ -27,6 +30,21 @@ class Rental extends Model
         'rental_BackupNumber',
         'rental_Status',
         'itemID',
-        'userID'
+        'userID',
+        'rental_StartDate',
+        'rental_EndDate',
+        'quantity'
     ];
+
+     // Relation to Item
+    public function item()
+    {
+        return $this->belongsTo(Item::class, 'itemID', 'itemID');
+    }
+
+    // Relation to User
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'userID', 'userID');
+    }
 }

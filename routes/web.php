@@ -8,6 +8,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\BookingController;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Controllers\PaymentController; 
+use App\Http\Controllers\RentalController;
 use App\Http\Middleware\AuthSession; // Use your existing middleware
 
 // Root page (redirect to login)
@@ -122,3 +123,57 @@ Route::post('/payment/callback', [PaymentController::class, 'paymentCallback'])-
 Route::get('/booking/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('booking.slots.json');
 Route::get('/booking/mini/slots-json', [BookingController::class, 'getMiniSlotsJson'])->name('booking.mini.slots.json');
 
+
+// Staff Rental Main Page
+Route::get('/staff/rental', [RentalController::class, 'index'])->name('staff.rental.main');
+
+// Add Rental Item Page
+Route::get('/staff/rental/add', function () {
+    return view('Rental.staff.addPage');
+})->name('staff.rental.add');
+
+
+Route::get('/staff/rentals/current', [RentalController::class, 'viewCurrent'])->name('staff.rentals.current');
+
+// Store Rental Item
+Route::post('/staff/rental/store', [RentalController::class, 'store'])->name('staff.rental.store');
+
+// Show all rentals with return_Status = requested
+Route::get('/staff/rentals/return-approval', [RentalController::class, 'viewReturnApprovals'])
+    ->name('staff.rentals.returnApproval');
+
+// Handle staff approval/rejection
+Route::post('/staff/rentals/return-approval/{rentalID}', [RentalController::class, 'updateReturnApproval'])
+    ->name('staff.rentals.updateReturnApproval');
+
+// Edit Item Page
+Route::get('/staff/rental/edit/{itemID}', [RentalController::class, 'edit'])->name('staff.rental.edit');
+
+// Update Item
+Route::put('/staff/rental/update/{itemID}', [RentalController::class, 'update'])->name('staff.rental.update');
+
+// Delete Rental Item
+Route::delete('/staff/rental/delete/{itemID}', [RentalController::class, 'destroy'])->name('staff.rental.delete');
+
+
+// ---------------- CUSTOMER RENTAL ROUTES ----------------
+Route::prefix('customer/rental')->name('customer.rental.')->group(function() {
+    Route::get('/', [RentalController::class, 'indexCustomer'])->name('main');
+    Route::get('/rent/{itemID}', [RentalController::class, 'rentPage'])->name('rent');
+    Route::post('/rent/{itemID}', [RentalController::class, 'processRent'])->name('process');
+    Route::get('/check-availability/{itemID}', [RentalController::class, 'checkAvailability'])->name('checkAvailability');
+    Route::get('/confirmation/{rentalID}', [RentalController::class, 'showConfirmation'])->name('confirmation');
+    Route::post('/confirm', [RentalController::class, 'confirmBooking'])->name('confirm');
+    Route::get('/rental/{rentalID}/edit', [RentalController::class, 'editPage'])->name('edit');
+    Route::post('/rental/{rentalID}/update', [RentalController::class, 'updateRent'])->name('update');
+    Route::delete('/rental/{rentalID}', [RentalController::class, 'destroyCustomer'])->name('destroy');
+    Route::post('/{rentalID}/pay', [PaymentController::class, 'createRentalPayment'])->name('pay');
+    Route::get('/payment/return', [PaymentController::class, 'rentalPaymentReturn'])->name('payment.return');
+    Route::post('/payment/callback', [PaymentController::class, 'rentalPaymentCallback'])->name('payment.callback');
+    
+    // ✅ Fixed history route
+    Route::get('/history', [RentalController::class, 'viewRentalHistory'])->name('history');
+
+    // ✅ Fixed request-approval route
+    Route::post('/{rentalID}/request-approval', [RentalController::class, 'requestApproval'])->name('requestApproval');
+});

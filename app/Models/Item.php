@@ -15,6 +15,8 @@ class Item extends Model
     // Primary key
     protected $primaryKey = 'itemID';
 
+    public $incrementing = false; // important for non-integer primary keys
+    protected $keyType = 'string';
     // Disable timestamps
     public $timestamps = false;
 
@@ -24,8 +26,18 @@ class Item extends Model
         'item_Name',
         'item_Quantity',
         'item_Price',
-        'item_Decsription',
+        'item_Description',
         'item_Status',
         'staffID'
     ];
+
+    public function staff()
+{
+    return $this->belongsTo(Staff::class, 'staffID', 'staffID');
+}
+    public function rentals()
+    {
+        return $this->hasMany(Rental::class, 'itemID', 'itemID');
+    }
+
 }

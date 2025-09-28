@@ -31,4 +31,19 @@ class User extends Model
         'user_Password',
         'user_Type'
     ];
+
+     public function staff()
+    {
+        return $this->hasOne(Staff::class, 'userID', 'userID');
+    }
+
+    public function customer()
+    {
+        return $this->hasOne(Customer::class, 'userID', 'userID');
+    }
+
+    public function rentals()
+    {
+        return $this->hasMany(Rental::class, 'userID', 'userID');
+    }
 }

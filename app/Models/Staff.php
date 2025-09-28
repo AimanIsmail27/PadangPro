@@ -18,6 +18,10 @@ class Staff extends Model
     // Disable timestamps
     public $timestamps = false;
 
+    // Treat primary key as string and not auto-incrementing
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     // Columns that can be mass assigned
     protected $fillable = [
         'staffID',
@@ -28,4 +32,16 @@ class Staff extends Model
         'staff_Job',
         'userID'
     ];
+
+    // Relationship: Staff -> Items
+    public function items()
+    {
+        return $this->hasMany(Item::class, 'staffID', 'staffID');
+    }
+
+    // Relationship: Staff -> User
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'userID', 'userID');
+    }
 }

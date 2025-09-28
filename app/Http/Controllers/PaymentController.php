@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\Payment;
 use App\Models\Booking;
+use App\Models\Rental;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -115,4 +117,126 @@ class PaymentController extends Controller
 
         return response()->json(['message' => 'Callback processed']);
     }
+
+
+  /**
+ * ==============================
+ *  RENTAL PART
+ * ==============================
+ */
+
+// Create ToyyibPay bill and redirect user for rental payment (DEV mode)
+public function createRentalPayment(Request $request, $rentalID)
+{
+    $rental = Rental::with('item')->where('rentalID', $rentalID)->firstOrFail();
+
+    $totalPrice = $request->input('total_amount');
+    \Log::info('POST received for rentalID: ' . $rentalID, ['request' => $request->all()]);
+
+    if (!$totalPrice || $totalPrice <= 0) {
+        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+            ->with('error', 'Invalid total amount for payment.');
+    }
+
+    $amount = intval($totalPrice * 100); // convert to cents
+
+    // Use dev environment
+    $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
+        'userSecretKey'           => env('TOYYIBPAY_SECRET_DEV'),
+        'categoryCode'            => env('TOYYIBPAY_CATEGORY_RENTAL'),
+        'billName'                => 'PadangPro Rental',
+        'billDescription'         => 'Payment for rental ' . $rental->rentalID,
+        'billPriceSetting'        => 1,
+        'billPayorInfo'           => 1,
+        'billAmount'              => $amount,
+        'billReturnUrl'           => route('customer.rental.payment.return'),
+        'billCallbackUrl'         => route('customer.rental.payment.callback'),
+        'billExternalReferenceNo' => $rental->rentalID,
+        'billTo'                  => $rental->rental_Name,
+        'billEmail'               => $rental->rental_Email,
+        'billPhone'               => $rental->rental_PhoneNumber,
+    ]);
+
+    \Log::info('ToyyibPay raw response for rentalID ' . $rentalID, ['body' => $response->body(), 'status' => $response->status()]);
+
+    $billData = $response->json();
+    \Log::info('ToyyibPay response for rentalID ' . $rentalID, ['response' => $billData]);
+
+    if (!isset($billData[0]['BillCode'])) {
+        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+            ->with('error', 'Failed to create payment. Please try again.');
+    }
+
+    $billCode = $billData[0]['BillCode'];
+
+    Payment::create([
+        'paymentID'         => 'PAY' . uniqid(),
+        'payer_Name'        => $rental->rental_Name,
+        'payer_BankAccount' => null,
+        'payment_Amount'    => $totalPrice,
+        'payment_Status'    => 'pending',
+        'rentalID'          => $rental->rentalID,
+        'userID'            => $rental->userID,
+    ]);
+
+    // Redirect to dev ToyyibPay payment page
+    return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $billCode);
+}
+
+// Handle return (user-facing after rental payment)
+public function rentalPaymentReturn(Request $request)
+{
+    $status   = $request->status_id ?? $request->status;
+    $rentalID = $request->order_id ?? $request->billExternalReferenceNo ?? null;
+
+    if (!$rentalID) {
+        return redirect()->route('customer.rental.main')
+            ->with('error', 'Rental payment status could not be verified.');
+    }
+
+    $payment = Payment::where('rentalID', $rentalID)->latest()->first();
+
+    if (!$payment) {
+        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+            ->with('error', 'Payment record not found.');
+    }
+
+    if ($status == 1) {
+        $payment->update(['payment_Status' => 'paid']);
+        Rental::where('rentalID', $rentalID)->update(['rental_Status' => 'paid']);
+
+        return redirect()->route('customer.rental.main')
+            ->with('success', 'Rental payment successful!');
+    } else {
+        $payment->update(['payment_Status' => 'failed']);
+        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+            ->with('error', 'Your rental payment was cancelled or failed. Please try again.');
+    }
+}
+
+// Handle callback (server-to-server confirmation)
+public function rentalPaymentCallback(Request $request)
+{
+    $rentalID = $request->billExternalReferenceNo;
+    $status   = $request->status;
+    $refNo    = $request->refno ?? null;
+
+    $payment = Payment::where('rentalID', $rentalID)->latest()->first();
+
+    if ($payment) {
+        if ($status == 1) {
+            $payment->update([
+                'payment_Status'    => 'paid',
+                'payer_BankAccount' => $refNo
+            ]);
+            Rental::where('rentalID', $rentalID)->update(['rental_Status' => 'paid']);
+        } else {
+            $payment->update(['payment_Status' => 'failed']);
+        }
+    }
+
+    return response()->json(['message' => 'Rental callback processed']);
+}
+
+
 }
