@@ -9,6 +9,8 @@ use App\Http\Controllers\BookingController;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Controllers\PaymentController; 
 use App\Http\Controllers\RentalController;
+use App\Http\Controllers\MatchController;
+use App\Http\Controllers\RatingController;
 use App\Http\Middleware\AuthSession; // Use your existing middleware
 
 // Root page (redirect to login)
@@ -177,3 +179,56 @@ Route::prefix('customer/rental')->name('customer.rental.')->group(function() {
     // ✅ Fixed request-approval route
     Route::post('/{rentalID}/request-approval', [RentalController::class, 'requestApproval'])->name('requestApproval');
 });
+
+// Matchmaking
+
+// Personal Matchmaking Ads Page (list of user's ads)
+Route::get('/matchmaking/personal', [MatchController::class, 'personalAds'])
+     ->name('matchmaking.personal');
+
+// Other advertisements page (view other ads)
+Route::get('/matchmaking/other', [MatchController::class, 'otherAds'])
+     ->name('matchmaking.other');
+
+// Show the form to create new ad
+Route::get('/matchmaking/add', function () {
+    return view('Matchmaking.addOfferPage');
+})->name('matchmaking.add');
+
+// Store new advertisement (form submission)
+Route::post('/matchmaking/store', [MatchController::class, 'store'])
+     ->name('matchmaking.store');
+
+     // View a single advertisement
+Route::get('/matchmaking/view/{adsID}', [MatchController::class, 'view'])
+     ->name('matchmaking.view');
+
+// Edit an advertisement
+Route::get('/matchmaking/edit/{adsID}', [MatchController::class, 'edit'])
+     ->name('matchmaking.edit');
+
+// Update an advertisement
+Route::post('/matchmaking/update/{adsID}', [MatchController::class, 'update'])->name('matchmaking.update');
+
+// Delete an advertisement
+Route::delete('/matchmaking/destroy/{adsID}', [MatchController::class, 'destroy'])
+     ->name('matchmaking.destroy');
+
+// Show form to join an advertisement
+Route::get('/matchmaking/join/{adsID}', [MatchController::class, 'joinForm'])
+    ->name('matchmaking.joinForm');
+
+// Submit request
+Route::post('/matchmaking/join/{adsID}', [MatchController::class, 'joinStore'])
+    ->name('matchmaking.joinStore');
+
+Route::post('/applications/{id}/accept', [MatchController::class, 'accept'])
+    ->name('applications.accept');
+
+Route::post('/applications/{id}/reject', [MatchController::class, 'reject'])
+    ->name('applications.reject');
+
+// Customer Rating Routes
+Route::get('/customer/rating', [RatingController::class, 'showCustomerRatings'])
+    ->name('customer.rating.main');
+

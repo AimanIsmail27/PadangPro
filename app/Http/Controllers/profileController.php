@@ -14,53 +14,69 @@ use Illuminate\Support\Facades\DB;
 class ProfileController extends Controller
 {
     /**
-     * Show the customer profile page.
-     */
-    public function showCustomerProfile(Request $request)
-    {
-        // Get the logged-in user ID from session
-        $userId = session('user_id');
+ * Show the customer profile page.
+ */
+public function showCustomerProfile(Request $request)
+{
+    $userId = session('user_id');
 
-        // Retrieve user information
-        $user = User::where('userID', $userId)->first();
+    $user = User::where('userID', $userId)->first();
+    $customer = Customer::where('userID', $userId)->first();
 
-        // Retrieve customer information linked to this user
-        $customer = Customer::where('userID', $userId)->first();
-
-        if (!$user || !$customer) {
-            return redirect()->route('customer.dashboard')->with('error', 'Profile not found.');
-        }
-
-        return view('Profile.customer.MainProfilePage', [
-            'fullName' => $customer->customer_FullName,
-            'email' => $user->user_Email,
-            'phoneNumber' => $customer->customer_PhoneNumber,
-            'age' => $customer->customer_Age,
-            'address' => $customer->customer_Address,
-            'position' => $customer->customer_Position,
-        ]);
+    if (!$user || !$customer) {
+        return redirect()->route('customer.dashboard')->with('error', 'Profile not found.');
     }
 
-    /**
-     * Show edit profile page.
-     */
-    public function edit()
-    {
-        $userId = session('user_id');
+    // Decode availability JSON
+    $availabilityDays = 'Not set';
+    $availabilityTimes = 'Not set';
 
-        $user = User::where('userID', $userId)->first();
-        $customer = Customer::where('userID', $userId)->first();
+    if (!empty($customer->customer_Availability)) {
+        $decoded = json_decode($customer->customer_Availability, true);
 
-        if (!$user || !$customer) {
-            return redirect()->route('customer.profile')->with('error', 'Profile not found.');
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            if (!empty($decoded['days'])) {
+                $availabilityDays = implode(', ', $decoded['days']);
+            }
+            if (!empty($decoded['time'])) {
+                $availabilityTimes = implode(', ', $decoded['time']);
+            }
         }
-
-        return view('Profile.customer.editPage', compact('user', 'customer'));
     }
 
-    /**
-     * Update customer profile.
-     */
+    return view('Profile.customer.MainProfilePage', [
+        'fullName'         => $customer->customer_FullName,
+        'email'            => $user->user_Email,
+        'phoneNumber'      => $customer->customer_PhoneNumber,
+        'age'              => $customer->customer_Age,
+        'address'          => $customer->customer_Address,
+        'position'         => $customer->customer_Position ?? 'Not set',
+        'skillLevel'       => $customer->customer_SkillLevel ?? 'Not set',
+        'availabilityDays' => $availabilityDays,
+        'availabilityTimes'=> $availabilityTimes,
+    ]);
+}
+
+/**
+ * Show edit profile page.
+ */
+public function edit()
+{
+    $userId = session('user_id');
+
+    $user = User::where('userID', $userId)->first();
+    $customer = Customer::where('userID', $userId)->first();
+
+    if (!$user || !$customer) {
+        return redirect()->route('customer.profile')->with('error', 'Profile not found.');
+    }
+
+    return view('Profile.customer.editPage', compact('user', 'customer'));
+}
+
+/**
+ * Update customer profile.
+ */
 public function update(Request $request)
 {
     $userId = session('user_id');
@@ -71,14 +87,19 @@ public function update(Request $request)
         return redirect()->route('customer.profile')->with('error', 'Profile not found.');
     }
 
-    // Validate input (all fields now required)
+    // Validate input
     $request->validate([
-        'customer_FullName' => 'required|string|max:255',
-        'user_Email' => 'required|email',
-        'customer_PhoneNumber' => 'required|string|max:20',
-        'customer_Age' => 'required|integer|min:1|max:120',
-        'customer_Address' => 'required|string|max:255',
-        'customer_Position' => 'required|string|max:50',
+        'customer_FullName'            => 'required|string|max:255',
+        'user_Email'                   => 'required|email',
+        'customer_PhoneNumber'         => 'required|string|max:20',
+        'customer_Age'                 => 'required|integer|min:1|max:120',
+        'customer_Address'             => 'required|string|max:255',
+        'customer_Position'            => 'required|string|max:50',
+        'customer_SkillLevel'          => 'nullable|integer|min:1|max:5',
+        'customer_Availability_days'   => 'nullable|array',
+        'customer_Availability_days.*' => 'string',
+        'customer_Availability_times'  => 'nullable|array',
+        'customer_Availability_times.*'=> 'string',
     ]);
 
     // Update user email
@@ -86,23 +107,35 @@ public function update(Request $request)
         'user_Email' => $request->user_Email,
     ]);
 
+    // Build availability JSON
+    $availability = null;
+    if ($request->has('customer_Availability_days') || $request->has('customer_Availability_times')) {
+        $availability = json_encode([
+            'days' => $request->input('customer_Availability_days', []),
+            'time' => $request->input('customer_Availability_times', []),
+        ]);
+    }
+
     // Update customer details
     $customer->update([
-        'customer_FullName' => $request->customer_FullName,
-        'customer_PhoneNumber' => $request->customer_PhoneNumber,
-        'customer_Age' => $request->customer_Age,
-        'customer_Address' => $request->customer_Address,
-        'customer_Position' => $request->customer_Position,
+        'customer_FullName'     => $request->customer_FullName,
+        'customer_PhoneNumber'  => $request->customer_PhoneNumber,
+        'customer_Age'          => $request->customer_Age,
+        'customer_Address'      => $request->customer_Address,
+        'customer_Position'     => $request->customer_Position,
+        'customer_SkillLevel'   => $request->customer_SkillLevel,
+        'customer_Availability' => $availability,
     ]);
 
     return redirect()->route('customer.profile')->with('success', 'Profile updated successfully!');
 }
 
-
-
+/**
+ * Delete customer account.
+ */
 public function destroy(Request $request)
 {
-    $userId = session('user_id'); // Now contains something like "UJKGQQCGM"
+    $userId = session('user_id');
 
     if (!$userId) {
         return redirect()->route('login')->with('error', 'Session expired. Please log in again.');

@@ -92,6 +92,15 @@
             border-radius: 6px;
             font-size: 14px;
         }
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .checkbox-group label {
+            font-weight: normal;
+            margin-right: 10px;
+        }
         .save-btn {
             background: #007bff;
             color: white;
@@ -167,13 +176,71 @@
 
                 <div class="form-group">
                     <label for="customer_Position">Preferred Football Position</label>
-                    <input type="text" name="customer_Position" id="customer_Position" value="{{ $customer->customer_Position }} " required>
+                    <input type="text" name="customer_Position" id="customer_Position" value="{{ $customer->customer_Position }}" required>
+                </div>
+
+                <!-- ✅ New Field: Skill Level -->
+                <div class="form-group">
+                    <label for="customer_SkillLevel">Skill Level (1–5)</label>
+                    <select name="customer_SkillLevel" id="customer_SkillLevel" required>
+                        <option value="">-- Select Skill Level --</option>
+                        <option value="1" {{ $customer->customer_SkillLevel == 1 ? 'selected' : '' }}>
+                            1 - Beginner
+                        </option>
+                        <option value="2" {{ $customer->customer_SkillLevel == 2 ? 'selected' : '' }}>
+                            2 - Social Player
+                        </option>
+                        <option value="3" {{ $customer->customer_SkillLevel == 3 ? 'selected' : '' }}>
+                            3 - Intermediate
+                        </option>
+                        <option value="4" {{ $customer->customer_SkillLevel == 4 ? 'selected' : '' }}>
+                            4 - Semi Professional
+                        </option>
+                        <option value="5" {{ $customer->customer_SkillLevel == 5 ? 'selected' : '' }}>
+                            5 - Professional
+                        </option>
+                    </select>
+                    <small class="text-gray-600">
+                        1 = Beginner, 2 = Social Player, 3 = Intermediate, 4 = Semi Professional, 5 = Professional
+                    </small>
+                </div>
+
+
+                <!-- ✅ Availability Days -->
+                @php
+                    $availability = json_decode($customer->customer_Availability, true) ?? ['days' => [], 'time' => []];
+                @endphp
+
+                <div class="form-group">
+                    <label>Availability - Days</label>
+                    <div class="checkbox-group">
+                        @foreach (['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] as $day)
+                            <label>
+                                <input type="checkbox" name="customer_Availability_days[]" value="{{ $day }}"
+                                    {{ in_array($day, $availability['days']) ? 'checked' : '' }}>
+                                {{ $day }}
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- ✅ Availability Times -->
+                <div class="form-group">
+                    <label>Availability - Times</label>
+                    <div class="checkbox-group">
+                        @foreach (['Morning','Afternoon','Evening','Night'] as $time)
+                            <label>
+                                <input type="checkbox" name="customer_Availability_times[]" value="{{ $time }}"
+                                    {{ in_array($time, $availability['time']) ? 'checked' : '' }}>
+                                {{ $time }}
+                            </label>
+                        @endforeach
+                    </div>
                 </div>
 
                 <button type="submit" class="save-btn">Save Changes</button>
                 <a href="{{ route('customer.profile') }}" class="cancel-btn">Cancel</a>
             </form>
-            
         </div>
     </div>
 

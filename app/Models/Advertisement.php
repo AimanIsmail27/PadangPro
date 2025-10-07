@@ -18,15 +18,20 @@ class Advertisement extends Model
     // Disable timestamps
     public $timestamps = false;
 
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     // Columns that can be mass assigned
     protected $fillable = [
         'adsID',
         'ads_Name',
         'ads_Type',
         'ads_Price',
-        'ads_Decsription',
+        'ads_Description',
         'ads_Status',
         'ads_SlotTime',
+        'ads_RequiredPosition',
+        'ads_MaxPlayers',
         'customerID'
     ];
 }

@@ -18,6 +18,17 @@ class Customer extends Model
     // Disable timestamps since your table does not have created_at & updated_at
     public $timestamps = false;
 
+      // Add this because your primary key is not auto-incrementing
+    public $incrementing = false;
+
+    // And also add this because it's a string
+    protected $keyType = 'string';
+
+    protected $casts = [
+    'customer_Availability' => 'array',
+];
+
+
     // Columns that can be mass assigned
     protected $fillable = [
         'customerID',
@@ -26,6 +37,14 @@ class Customer extends Model
         'customer_PhoneNumber',
         'customer_Address',
         'customer_Position',
+        'customer_SkillLevel',
+        'customer_Availability',
         'userID'
     ];
+
+    public function applications()
+{
+    return $this->hasMany(Applications::class, 'customerID', 'customerID');
+}
+
 }

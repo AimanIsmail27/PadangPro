@@ -136,8 +136,23 @@
                     </ul>
                 </li>
                 <li class="nav-item"><a href="{{ route('customer.rental.main') }}">Rental Item</a></li>
-                <li class="nav-item">Matchmaking</li>
-                <li class="nav-item">Rating and Review</li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#">Matchmaking</a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="{{ route('matchmaking.personal') }}">
+                                Your Advertisement
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ route('matchmaking.other') }}">
+                                Other Advertisement
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="nav-item"><a href="{{ route('customer.rating.main') }}">Rating and Review</a></li>
                 <li class="nav-item"><a href="{{ route('logout') }}">Logout</a></li>
             </ul>
         </nav>
@@ -153,5 +168,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    @stack('scripts')
+
 </body>
 </html>
