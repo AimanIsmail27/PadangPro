@@ -18,6 +18,9 @@ class Rating extends Model
     // Disable timestamps
     public $timestamps = false;
 
+    public $incrementing = false; // since we generate manually
+    protected $keyType = 'string';
+
     // Columns that can be mass assigned
     protected $fillable = [
         'ratingID',
@@ -27,4 +30,10 @@ class Rating extends Model
         'review_Time',
         'userID'
     ];
+
+    public function customer()
+{
+    return $this->belongsTo(Customer::class, 'userID', 'userID');
+}
+
 }

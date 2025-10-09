@@ -17,10 +17,30 @@
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold text-[#1E2A78]">Your Submitted Review</h2>
             <div class="space-x-3">
-                <button class="bg-[#1E2A78] text-white px-4 py-2 rounded-md hover:bg-[#2638a0] transition">Add New Review</button>
-                <button class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition">Edit Review</button>
+                @if(empty($yourSubmittedReview))
+                    <!-- Show Add New Review button only if user has not submitted -->
+                    <a href="{{ route('customer.rating.add') }}" 
+                    class="bg-[#1E2A78] text-white px-4 py-2 rounded-md hover:bg-[#2638a0] transition">
+                    Add New Review
+                    </a>
+                @else
+                    <!-- Otherwise, show Edit button -->
+                    <a href="{{ route('customer.rating.edit', $yourSubmittedReview['ratingID']) }}" 
+                    class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition">
+                    Edit Review
+                    </a>
+
+                     <!-- Delete Review Button (SweetAlert2 confirmation) -->
+                    <a href="javascript:void(0);" 
+                    onclick="confirmDelete('{{ route('customer.rating.delete', $yourSubmittedReview['ratingID']) }}')" 
+                    class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition">
+                    Delete Review
+                    </a>
+                @endif
             </div>
+
         </div>
+
 
         @if(!empty($yourSubmittedReview))
         <div class="border-t pt-4">
@@ -63,7 +83,7 @@
             @foreach ($allRatings as $rating)
                 <div class="bg-white p-5 rounded-lg shadow-md border hover:shadow-lg transition">
                     <div class="flex items-center justify-between mb-2">
-                        <h3 class="font-semibold text-lg text-[#1E2A78]">User {{ $rating['userID'] }}</h3>
+                        <h3 class="font-semibold text-lg text-[#1E2A78]">{{ $rating->customer->customer_FullName ?? 'Anonymous User' }}</h3>
                         <span class="text-yellow-500 font-bold">
                             {{ str_repeat('★', $rating['rating_Score']) }}
                             {{ str_repeat('☆', 5 - $rating['rating_Score']) }}
@@ -111,4 +131,48 @@
         @endif
     </div>
 </div>
+
+<!-- =================== SWEETALERT2 =================== -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+@if (session('success'))
+    Swal.fire({
+        title: "Success!",
+        text: "{{ session('success') }}",
+        icon: "success",
+        confirmButtonColor: "#1E2A78",
+    });
+@endif
+
+@if (session('error'))
+    Swal.fire({
+        title: "Action Not Allowed",
+        text: "{{ session('error') }}",
+        icon: "error",
+        confirmButtonColor: "#1E2A78",
+    });
+@endif
+
+function confirmDelete(url) {
+    Swal.fire({
+        title: "Are you sure?",
+        text: "This action will permanently delete your review.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Redirect to the delete route
+            window.location.href = url;
+        }
+    });
+}
+</script>
 @endsection
+
+
+
+

@@ -13,10 +13,15 @@ use App\Http\Controllers\MatchController;
 use App\Http\Controllers\RatingController;
 use App\Http\Middleware\AuthSession; // Use your existing middleware
 
+
+Route::view('/', 'landing.home')->name('home');
+Route::view('/about', 'landing.about')->name('about');
+
+
 // Root page (redirect to login)
-Route::get('/', function () {
-    return redirect()->route('login');
-});
+//Route::get('/', function () {
+  //  return redirect()->route('login');
+//});
 
 // Routes that should prevent going back after login/logout
 Route::middleware([PreventBackHistory::class])->group(function () {
@@ -231,4 +236,18 @@ Route::post('/applications/{id}/reject', [MatchController::class, 'reject'])
 // Customer Rating Routes
 Route::get('/customer/rating', [RatingController::class, 'showCustomerRatings'])
     ->name('customer.rating.main');
+
+// Show Add Review Page
+Route::get('/customer/rating/add', [RatingController::class, 'showAddReviewForm'])
+    ->name('customer.rating.add');
+
+// Submit New Review
+Route::post('/customer/rating/add', [RatingController::class, 'addNewReview'])
+    ->name('customer.rating.store');
+
+Route::get('/customer/rating/edit/{ratingID}', [RatingController::class, 'showEditReviewForm'])->name('customer.rating.edit');
+Route::post('/customer/rating/update/{ratingID}', [RatingController::class, 'updateReview'])->name('customer.rating.update');
+
+Route::get('/customer/rating/delete/{ratingID}', [RatingController::class, 'deleteReview'])
+    ->name('customer.rating.delete');
 

@@ -4,40 +4,25 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Models\Rating;
+use App\Models\Customer; 
+use App\Models\Booking;
+use App\Models\Rental;
+use App\Models\Advertisement;
+use App\Models\Applications;
+use Carbon\Carbon; // ✅ Import Carbon for timezone handling
 
 class RatingController extends Controller
 {
     /**
-     * Display the main customer rating and review page with dummy data.
+     * Display the main customer rating and review page.
      */
     public function showCustomerRatings(Request $request)
     {
-        // Simulated logged-in user ID
-        $currentUserID = 'U001';
+        $currentUserID = $request->session()->get('user_id');
 
-        // Dummy data for the user's own submitted review
-        $yourSubmittedReview = [
-            'ratingID' => 'R001',
-            'rating_Score' => 4,
-            'review_Given' => 'Great experience! Booking was smooth and the field was well maintained.',
-            'review_Date' => '2025-10-06',
-            'review_Time' => '2025-10-06 14:30:00',
-            'userID' => $currentUserID,
-        ];
-
-        // Dummy data for all system-wide ratings
-        $allRatings = collect([
-            ['ratingID' => 'R002', 'rating_Score' => 5, 'review_Given' => 'Amazing service and good facilities!', 'review_Date' => '2025-10-05', 'review_Time' => '2025-10-05 09:15:00', 'userID' => 'U002'],
-            ['ratingID' => 'R003', 'rating_Score' => 3, 'review_Given' => 'It was okay, but the lighting could be better.', 'review_Date' => '2025-10-04', 'review_Time' => '2025-10-04 18:45:00', 'userID' => 'U003'],
-            ['ratingID' => 'R004', 'rating_Score' => 5, 'review_Given' => 'Best pitch I’ve ever played on!', 'review_Date' => '2025-10-03', 'review_Time' => '2025-10-03 20:00:00', 'userID' => 'U004'],
-            ['ratingID' => 'R005', 'rating_Score' => 2, 'review_Given' => 'Ground was slippery and dirty.', 'review_Date' => '2025-10-02', 'review_Time' => '2025-10-02 13:20:00', 'userID' => 'U005'],
-            ['ratingID' => 'R006', 'rating_Score' => 4, 'review_Given' => 'Friendly staff and easy process!', 'review_Date' => '2025-10-01', 'review_Time' => '2025-10-01 16:40:00', 'userID' => 'U006'],
-            ['ratingID' => 'R007', 'rating_Score' => 3, 'review_Given' => 'Average experience, could improve the booking UI.', 'review_Date' => '2025-09-30', 'review_Time' => '2025-09-30 10:50:00', 'userID' => 'U007'],
-            ['ratingID' => 'R008', 'rating_Score' => 5, 'review_Given' => 'Fantastic atmosphere!', 'review_Date' => '2025-09-29', 'review_Time' => '2025-09-29 12:00:00', 'userID' => 'U008'],
-            ['ratingID' => 'R009', 'rating_Score' => 1, 'review_Given' => 'Very poor management. Not recommended.', 'review_Date' => '2025-09-28', 'review_Time' => '2025-09-28 17:10:00', 'userID' => 'U009'],
-            ['ratingID' => 'R010', 'rating_Score' => 4, 'review_Given' => 'Good facilities and smooth process overall.', 'review_Date' => '2025-09-27', 'review_Time' => '2025-09-27 11:00:00', 'userID' => 'U010'],
-            ['ratingID' => 'R011', 'rating_Score' => 2, 'review_Given' => 'Was okay, but staff seemed unorganized.', 'review_Date' => '2025-09-26', 'review_Time' => '2025-09-26 15:30:00', 'userID' => 'U011'],
-        ]);
+        $yourSubmittedReview = Rating::with('customer')->where('userID', $currentUserID)->first();
+        $allRatings = Rating::with('customer')->get();
 
         // ======================
         // Sorting Logic
@@ -59,7 +44,6 @@ class RatingController extends Controller
                 break;
         }
 
-        // Reindex after sorting
         $allRatings = $allRatings->values();
 
         // ======================
@@ -76,13 +60,140 @@ class RatingController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        // ======================
-        // Return to Blade View
-        // ======================
         return view('Rating.customer.MainRatingPage', [
             'yourSubmittedReview' => $yourSubmittedReview,
             'allRatings' => $paginatedRatings,
             'currentSort' => $sortBy,
         ]);
+    }
+
+    /**
+     * Show Add New Review Form
+     */
+    public function showAddReviewForm()
+    {
+        return view('Rating.customer.addPage');
+    }
+
+    /**
+     * Store a new rating and review with eligibility check.
+     */
+    public function addNewReview(Request $request)
+    {
+        $currentUserID = $request->session()->get('user_id');
+
+        // ✅ Retrieve related customerID
+        $customer = Customer::where('userID', $currentUserID)->first();
+        $customerID = $customer ? $customer->customerID : null;
+
+        // ✅ Eligibility Check
+        $hasBooking = Booking::where('userID', $currentUserID)
+            ->where('booking_Status', 'completed')
+            ->exists();
+
+        $hasRental = Rental::where('userID', $currentUserID)
+            ->where('rental_Status', 'paid')
+            ->exists();
+
+        $hasAdvertisement = false;
+        $hasApplication = false;
+
+        if ($customerID) {
+            $hasAdvertisement = Advertisement::where('customerID', $customerID)->exists();
+            $hasApplication = Applications::where('customerID', $customerID)->exists();
+        }
+
+        if (!$hasBooking && !$hasRental && !$hasAdvertisement && !$hasApplication) {
+            return redirect()->back()->with('error', 'You must have at least one completed activity (booking, rental, or matchmaking) before posting a review.');
+        }
+
+        // ✅ Validate Input
+        $validated = $request->validate([
+            'rating_Score' => 'required|integer|min:1|max:5',
+            'review_Given' => 'required|string|max:255',
+        ]);
+
+        // ✅ Kuala Lumpur timezone
+        $nowKL = Carbon::now('Asia/Kuala_Lumpur');
+
+        // ✅ Generate unique ratingID
+        $uniqueID = 'RAT' . strtoupper(uniqid());
+
+        // ✅ Store the review
+        Rating::create([
+            'ratingID' => $uniqueID,
+            'rating_Score' => $validated['rating_Score'],
+            'review_Given' => $validated['review_Given'],
+            'review_Date' => $nowKL->toDateString(),
+            'review_Time' => $nowKL->format('Y-m-d H:i:s'),
+            'userID' => $currentUserID,
+        ]);
+
+        return redirect()->route('customer.rating.main')
+            ->with('success', 'Your review has been submitted successfully!');
+    }
+
+    /**
+     * Show the edit review form for a specific rating.
+     */
+    public function showEditReviewForm($ratingID)
+    {
+        $review = Rating::where('ratingID', $ratingID)->first();
+
+        if (!$review) {
+            return redirect()->route('customer.rating.main')->with('error', 'Review not found.');
+        }
+
+        return view('Rating.customer.editPage', compact('review'));
+    }
+
+    /**
+     * Handle review update request.
+     */
+    public function updateReview(Request $request, $ratingID)
+    {
+        $review = Rating::where('ratingID', $ratingID)->first();
+
+        if (!$review) {
+            return redirect()->route('customer.rating.main')->with('error', 'Review not found.');
+        }
+
+        $validated = $request->validate([
+            'rating_Score' => 'required|integer|min:1|max:5',
+            'review_Given' => 'required|string|max:255',
+        ]);
+
+        // ✅ Kuala Lumpur timezone for update
+        $nowKL = Carbon::now('Asia/Kuala_Lumpur');
+
+        $review->update([
+            'rating_Score' => $validated['rating_Score'],
+            'review_Given' => $validated['review_Given'],
+            'review_Date' => $nowKL->toDateString(),
+            'review_Time' => $nowKL->format('Y-m-d H:i:s'),
+        ]);
+
+        return redirect()->route('customer.rating.main')->with('success', 'Your review has been updated successfully!');
+    }
+
+    /**
+     * Delete user's own review.
+     */
+    public function deleteReview($ratingID, Request $request)
+    {
+        $currentUserID = $request->session()->get('user_id');
+
+        $review = Rating::where('ratingID', $ratingID)
+                        ->where('userID', $currentUserID)
+                        ->first();
+
+        if (!$review) {
+            return redirect()->back()->with('error', 'Review not found or you are not authorized to delete it.');
+        }
+
+        $review->delete();
+
+        return redirect()->route('customer.rating.main')
+                         ->with('success', 'Your review has been deleted successfully.');
     }
 }

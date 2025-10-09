@@ -47,4 +47,10 @@ class Customer extends Model
     return $this->hasMany(Applications::class, 'customerID', 'customerID');
 }
 
+public function ratings()
+{
+    return $this->hasMany(Rating::class, 'userID', 'userID');
+}
+
+
 }
