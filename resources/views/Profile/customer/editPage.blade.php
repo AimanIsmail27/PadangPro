@@ -1,248 +1,204 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Profile - PadangPro</title>
-    @vite('resources/css/app.css')
-    <style>
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f9f9f9;
-            margin: 0;
-            padding: 0;
-        }
-        aside {
-            width: 220px;
-            background: white;
-            color: #000;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
-        aside .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin-bottom: 40px;
-        }
-        aside nav ul {
-            list-style: none;
-            padding: 0;
-        }
-        aside nav ul li {
-            padding: 12px 0;
-            cursor: pointer;
-            font-weight: 500;
-        }
-        aside nav ul li a {
-            text-decoration: none;
-            color: #000;
-            display: block;
-        }
-        aside nav ul li:hover {
-            background: rgba(255, 255, 255, 0.13);
-            border-radius: 8px;
-            padding-left: 10px;
-            transition: 0.3s;
-        }
-        .main {
-            margin-left: 240px;
-            padding: 30px;
-        }
-        .profile-section {
-            background: #1c2d6e;
-            border-radius: 8px;
-            height: 120px;
-            position: relative;
-        }
-        .profile-header {
-            color: white;
-            font-size: 20px;
-            font-weight: bold;
-            padding: 20px 30px;
-        }
-        .profile-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            padding: 30px;
-            width: 80%;
-            margin: 0 auto;
-            position: relative;
-            top: -40px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 6px;
-        }
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-        .checkbox-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .checkbox-group label {
-            font-weight: normal;
-            margin-right: 10px;
-        }
-        .save-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .cancel-btn {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-left: 10px;
-            font-size: 16px;
-        }
-    </style>
-</head>
-<body>
+@extends('layout.customer')
 
-    <!-- Sidebar -->
-    <aside>
-        <div class="logo">PadangPro</div>
-        <nav>
-            <ul>
-                <li><a href="{{ route('customer.dashboard') }}">Dashboard</a></li>
-                <li><a href="{{ route('customer.profile') }}">Profile</a></li>
-                <li>Booking</li>
-                <li>Rental</li>
-                <li>Matchmaking</li>
-                <li>Rating and Review</li>
-                <li><a href="{{ route('logout') }}">Logout</a></li>
-            </ul>
-        </nav>
-    </aside>
+@section('title', 'Edit My Profile')
 
-    <div class="main">
-        <div class="profile-section">
-            <div class="profile-header">EDIT PROFILE</div>
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+@endpush
+
+@section('content')
+
+<div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">Edit Profile</h1>
+    <p class="mt-2 text-indigo-100">Update your personal information and matchmaking settings.</p>
+</div>
+
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-8 md:p-10 w-11/12 mx-auto -mt-16 relative">
+
+    <form action="{{ route('customer.profile.update') }}" method="POST" class="space-y-6">
+        @csrf
+        
+        <h2 class="text-xl font-bold text-gray-800 border-b pb-3">Personal Information</h2>
+
+        {{-- Display general validation errors (for THIS form only) --}}
+        @if ($errors->default->any())
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <strong class="font-bold">Error!</strong>
+                <ul class="mt-2 list-disc list-inside">
+                    @foreach ($errors->default->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="customer_FullName" class="block text-sm font-medium text-gray-700">Full Name</label>
+                <input type="text" name="customer_FullName" id="customer_FullName" value="{{ old('customer_FullName', $customer->customer_FullName) }}" 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <div>
+                <label for="user_Email" class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" name="user_Email" id="user_Email" value="{{ old('user_Email', $user->user_Email) }}" 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <div>
+                <label for="customer_PhoneNumber" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                <input type="text" name="customer_PhoneNumber" id="customer_PhoneNumber" value="{{ old('customer_PhoneNumber', $customer->customer_PhoneNumber) }}" 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <div>
+                <label for="customer_Age" class="block text-sm font-medium text-gray-700">Age</label>
+                <input type="number" name="customer_Age" id="customer_Age" value="{{ old('customer_Age', $customer->customer_Age) }}" 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+        </div>
+        
+        <div>
+            <label for="customer_Address" class="block text-sm font-medium text-gray-700">Address</label>
+            <textarea name="customer_Address" id="customer_Address" rows="3" 
+                      class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>{{ old('customer_Address', $customer->customer_Address) }}</textarea>
+        </div>
+        
+        <hr class="my-8">
+        <h2 class="text-xl font-bold text-gray-800 border-b pb-3">Matchmaking Settings</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="customer_Position" class="block text-sm font-medium text-gray-700">Preferred Football Position</label>
+                <input type="text" name="customer_Position" id="customer_Position" value="{{ old('customer_Position', $customer->customer_Position) }}" 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Striker, Goalkeeper" required>
+            </div>
+            <div>
+                <label for="customer_SkillLevel" class="block text-sm font-medium text-gray-700">Skill Level (1–5)</label>
+                <select name="customer_SkillLevel" id="customer_SkillLevel" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                    <option value="" disabled>-- Select Skill Level --</option>
+                    <option value="1" {{ old('customer_SkillLevel', $customer->customer_SkillLevel) == 1 ? 'selected' : '' }}>1 - Beginner</option>
+                    <option value="2" {{ old('customer_SkillLevel', $customer->customer_SkillLevel) == 2 ? 'selected' : '' }}>2 - Social Player</option>
+                    <option value="3" {{ old('customer_SkillLevel', $customer->customer_SkillLevel) == 3 ? 'selected' : '' }}>3 - Intermediate</option>
+                    <option value="4" {{ old('customer_SkillLevel', $customer->customer_SkillLevel) == 4 ? 'selected' : '' }}>4 - Semi Professional</option>
+                    <option value="5" {{ old('customer_SkillLevel', $customer->customer_SkillLevel) == 5 ? 'selected' : '' }}>5 - Professional</option>
+                </select>
+            </div>
         </div>
 
-        <div class="profile-card">
-            <form action="{{ route('customer.profile.update') }}" method="POST">
-                @csrf
+        @php
+            $availability = json_decode($customer->customer_Availability, true) ?? ['days' => [], 'time' => []];
+            $selectedDays = old('customer_Availability_days', $availability['days']);
+            $selectedTimes = old('customer_Availability_times', $availability['time']);
+        @endphp
 
-                <div class="form-group">
-                    <label for="customer_FullName">Full Name</label>
-                    <input type="text" name="customer_FullName" id="customer_FullName" value="{{ $customer->customer_FullName }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="user_Email">Email</label>
-                    <input type="email" name="user_Email" id="user_Email" value="{{ $user->user_Email }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="customer_PhoneNumber">Phone Number</label>
-                    <input type="text" name="customer_PhoneNumber" id="customer_PhoneNumber" value="{{ $customer->customer_PhoneNumber }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="customer_Age">Age</label>
-                    <input type="number" name="customer_Age" id="customer_Age" value="{{ $customer->customer_Age }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="customer_Address">Address</label>
-                    <textarea name="customer_Address" id="customer_Address" required>{{ $customer->customer_Address }}</textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="customer_Position">Preferred Football Position</label>
-                    <input type="text" name="customer_Position" id="customer_Position" value="{{ $customer->customer_Position }}" required>
-                </div>
-
-                <!-- ✅ New Field: Skill Level -->
-                <div class="form-group">
-                    <label for="customer_SkillLevel">Skill Level (1–5)</label>
-                    <select name="customer_SkillLevel" id="customer_SkillLevel" required>
-                        <option value="">-- Select Skill Level --</option>
-                        <option value="1" {{ $customer->customer_SkillLevel == 1 ? 'selected' : '' }}>
-                            1 - Beginner
-                        </option>
-                        <option value="2" {{ $customer->customer_SkillLevel == 2 ? 'selected' : '' }}>
-                            2 - Social Player
-                        </option>
-                        <option value="3" {{ $customer->customer_SkillLevel == 3 ? 'selected' : '' }}>
-                            3 - Intermediate
-                        </option>
-                        <option value="4" {{ $customer->customer_SkillLevel == 4 ? 'selected' : '' }}>
-                            4 - Semi Professional
-                        </option>
-                        <option value="5" {{ $customer->customer_SkillLevel == 5 ? 'selected' : '' }}>
-                            5 - Professional
-                        </option>
-                    </select>
-                    <small class="text-gray-600">
-                        1 = Beginner, 2 = Social Player, 3 = Intermediate, 4 = Semi Professional, 5 = Professional
-                    </small>
-                </div>
-
-
-                <!-- ✅ Availability Days -->
-                @php
-                    $availability = json_decode($customer->customer_Availability, true) ?? ['days' => [], 'time' => []];
-                @endphp
-
-                <div class="form-group">
-                    <label>Availability - Days</label>
-                    <div class="checkbox-group">
-                        @foreach (['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] as $day)
-                            <label>
-                                <input type="checkbox" name="customer_Availability_days[]" value="{{ $day }}"
-                                    {{ in_array($day, $availability['days']) ? 'checked' : '' }}>
-                                {{ $day }}
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-
-                <!-- ✅ Availability Times -->
-                <div class="form-group">
-                    <label>Availability - Times</label>
-                    <div class="checkbox-group">
-                        @foreach (['Morning','Afternoon','Evening','Night'] as $time)
-                            <label>
-                                <input type="checkbox" name="customer_Availability_times[]" value="{{ $time }}"
-                                    {{ in_array($time, $availability['time']) ? 'checked' : '' }}>
-                                {{ $time }}
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-
-                <button type="submit" class="save-btn">Save Changes</button>
-                <a href="{{ route('customer.profile') }}" class="cancel-btn">Cancel</a>
-            </form>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Availability - Days</label>
+            <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+                @foreach (['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] as $day)
+                    <label class="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 transition">
+                        <input type="checkbox" name="customer_Availability_days[]" value="{{ $day }}" 
+                               class="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                               {{ in_array($day, $selectedDays) ? 'checked' : '' }}>
+                        <span>{{ $day }}</span>
+                    </label>
+                @endforeach
+            </div>
         </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Availability - Times</label>
+            <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+                @foreach (['Morning','Afternoon','Evening','Night'] as $time)
+                    <label class="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 transition">
+                        <input type="checkbox" name="customer_Availability_times[]" value="{{ $time }}" 
+                               class="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                               {{ in_array($time, $selectedTimes) ? 'checked' : '' }}>
+                        <span>{{ $time }}</span>
+                    </label>
+                @endforeach
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4 pt-6 border-t">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-all transform hover:scale-105">
+                Save Changes
+            </button>
+            <a href="{{ route('customer.profile') }}" class="text-gray-600 hover:text-gray-900 font-medium">
+                Cancel
+            </a>
+        </div>
+    </form>
+
+    {{-- =============================================== --}}
+    {{-- NEW: Change Password Form --}}
+    {{-- =============================================== --}}
+    <div class="mt-12 pt-8 border-t">
+        <div class="text-center mb-8">
+            <h2 class="text-2xl font-bold text-gray-800">Change Your Password</h2>
+            <p class="text-gray-500">Update your password below.</p>
+        </div>
+
+        <form action="{{ route('customer.password.update') }}" method="POST" class="space-y-6 max-w-lg mx-auto">
+            @csrf
+            
+            <div>
+                <label for="current_password" class="block text-sm font-medium text-gray-700">Current Password</label>
+                <input type="password" name="current_password" id="current_password" required
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <div>
+                <label for="new_password" class="block text-sm font-medium text-gray-700">New Password</label>
+                <input type="password" name="new_password" id="new_password" required
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <div>
+                <label for="new_password_confirmation" class="block text-sm font-medium text-gray-700">Confirm New Password</label>
+                <input type="password" name="new_password_confirmation" id="new_password_confirmation" required
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <div class="flex items-center gap-4 pt-4">
+                <button type="submit"
+                        class="py-2 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
+                    Change Password
+                </button>
+            </div>
+        </form>
     </div>
 
-</body>
-</html>
+</div>
+@endsection
+
+@push('scripts')
+{{-- SweetAlert2 for success messages --}}
+@if(session('success'))
+    <script>
+        Swal.fire({
+            title: 'Success!',
+            text: "{{ session('success') }}",
+            icon: 'success',
+            confirmButtonColor: '#4f46e5', // Indigo-600
+            confirmButtonText: 'OK'
+        });
+    </script>
+@endif
+
+{{-- SweetAlert for PASSWORD errors --}}
+@if ($errors->password->any())
+    <script>
+        Swal.fire({
+            title: 'Password Change Failed',
+            html: `
+                <ul class="text-left list-disc list-inside">
+                    @foreach ($errors->password->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            `,
+            icon: 'error',
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Try Again'
+        });
+    </script>
+@endif
+@endpush

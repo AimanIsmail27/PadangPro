@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class User extends Model
 {
@@ -46,4 +47,29 @@ class User extends Model
     {
         return $this->hasMany(Rental::class, 'userID', 'userID');
     }
+
+    public function administrator()
+    {
+        return $this->hasOne(Administrator::class, 'userID', 'userID');
+    }
+
+    protected function fullName(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($this->user_Type === 'administrator' && $this->administrator) {
+                    return $this->administrator->admin_FullName;
+                }
+                if ($this->user_Type === 'customer' && $this->customer) {
+                    return $this->customer->customer_FullName;
+                }
+                if ($this->user_Type === 'staff' && $this->staff) {
+                    return $this->staff->staff_FullName;
+                }
+                return 'N/A'; // Fallback
+            },
+        );
+    }
+
+    
 }

@@ -1,52 +1,80 @@
 @extends('layout.staff')
 
+@section('title', 'Current Rental Record')
+
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+@endpush
+
 @section('content')
 
-<!-- Soft Green Header -->
-<div class="bg-green-200 rounded-xl shadow-md p-6 mb-6">
-    <h2 class="text-2xl font-bold text-black">Current Rental Record</h2>
-    <p class="text-black mt-2">Welcome to the rental management page. Staff can manage rental items here.</p>
+<div class="bg-gradient-to-r from-lime-500 to-emerald-600 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">Current Rental Record</h1>
+    <p class="mt-2 text-lime-100">View all upcoming and currently active rentals.</p>
 </div>
 
-<div class="container mx-auto p-6">
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-16 relative">
 
-    <div class="overflow-x-auto shadow-lg rounded-lg">
-        <table class="min-w-full bg-white border border-gray-200">
-            <thead class="bg-green-100 text-gray-700 uppercase text-sm">
-                <tr>
-                    <th class="py-3 px-4 text-left">Rental ID</th>
-                    <th class="py-3 px-4 text-left">Item</th>
-                    <th class="py-3 px-4 text-left">Start Date</th>
-                    <th class="py-3 px-4 text-left">End Date</th>
-                    <th class="py-3 px-4 text-center">Quantity</th>
-                    <th class="py-3 px-4 text-center">Status</th>
-                </tr>
-            </thead>
-            <tbody class="text-gray-700 text-sm">
-                @forelse($rentals as $rental)
-                <tr class="border-b hover:bg-green-50 transition">
-                    <td class="py-3 px-4 font-medium">{{ $rental->rentalID }}</td>
-                    <td class="py-3 px-4">{{ $rental->item->item_Name ?? 'N/A' }}</td>
-                    <td class="py-3 px-4">{{ \Carbon\Carbon::parse($rental->rental_StartDate)->format('d M Y') }}</td>
-                    <td class="py-3 px-4">{{ \Carbon\Carbon::parse($rental->rental_EndDate)->format('d M Y') }}</td>
-                    <td class="py-3 px-4 text-center">{{ $rental->quantity }}</td>
-                    <td class="py-3 px-4 text-center">
-                        <span class="px-3 py-1 rounded-full text-sm font-semibold
-                            {{ strtolower($rental->rental_Status) == 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
-                            {{ ucfirst($rental->rental_Status) }}
-                        </span>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="7" class="text-center py-6 text-gray-500 italic">
-                        No current or upcoming rentals.
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+    @if($rentals->isEmpty())
+        <div class="text-center py-12">
+            <i class="bi bi-box-seam text-6xl text-gray-300"></i>
+            <h3 class="mt-4 text-2xl font-bold text-gray-700">No Current Rentals</h3>
+            <p class="mt-2 text-gray-500">There are no current or upcoming rentals at this time.</p>
+        </div>
+    @else
+        <div class="overflow-x-auto shadow-md rounded-xl border border-gray-100">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-zinc-800">
+                    <tr>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">
+                            Rental ID
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">
+                            Item
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">
+                            Start Date
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">
+                            End Date
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-center text-xs font-semibold text-lime-300 uppercase tracking-wider">
+                            Quantity
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-center text-xs font-semibold text-lime-300 uppercase tracking-wider">
+                            Status
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @foreach($rentals as $rental)
+                        <tr class="hover:bg-slate-50/50 transition-all">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ $rental->rentalID }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {{ $rental->item->item_Name ?? 'N/A' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {{ \Carbon\Carbon::parse($rental->rental_StartDate)->format('d M Y') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {{ \Carbon\Carbon::parse($rental->rental_EndDate)->format('d M Y') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
+                                {{ $rental->quantity }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold 
+                                    {{ strtolower($rental->rental_Status) == 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                                    {{ ucfirst($rental->rental_Status) }}
+                                </span>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 </div>
-
 @endsection

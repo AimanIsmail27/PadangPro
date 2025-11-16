@@ -1,92 +1,150 @@
-@extends('layout.admin') {{-- Your existing admin layout with welcome, fullname, etc. --}}
+@extends('layout.admin')
+
+@section('title', 'Edit Admin Profile - PadangPro')
 
 @section('content')
-    {{-- Yellow header for admin --}}
-    <div class="profile-section" style="
-        background: #dbcf27f8;
-        border-radius: 8px;
-        height: 120px;
-        position: relative;">
-        <div class="profile-header" style="
-            color: white;
-            font-size: 20px;
-            font-weight: bold;
-            padding: 20px 30px;">
-            EDIT ADMIN PROFILE
-        </div>
+
+<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 text-white pt-8 pb-24 px-10 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold">Edit Admin Profile</h1>
+</div>
+
+<div class="bg-white rounded-xl shadow-md border border-gray-100 p-10 w-4/5 mx-auto -mt-16 relative">
+
+    <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold text-gray-800">Update Your Information</h2>
+        <p class="text-gray-500">Make changes to your profile details below.</p>
     </div>
 
-    {{-- White container with same design as before --}}
-    <div class="profile-card" style="
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        padding: 30px;
-        width: 80%;
-        margin: 0 auto;
-        position: relative;
-        top: -40px;">
-        <form action="{{ route('admin.profile.update') }}" method="POST">
-            @csrf
+    {{-- Display general validation errors (for THIS form only) --}}
+    @if ($errors->default->any())
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <ul class="mt-2 list-disc list-inside">
+                @foreach ($errors->default->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
-            @method('PUT') {{-- Add this line to match the route method --}}
+    <form action="{{ route('admin.profile.update') }}" method="POST" class="space-y-6">
+        @csrf
+        @method('PUT')
 
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label for="admin_FullName" style="font-weight: bold; display: block; margin-bottom: 6px;">Full Name</label>
-                <input type="text" name="admin_FullName" id="admin_FullName"
-                       value="{{ $admin->admin_FullName }}" required
-                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;">
+        <div>
+            <label for="admin_FullName" class="block text-sm font-medium text-gray-700">Full Name</label>
+            <input type="text" name="admin_FullName" id="admin_FullName" value="{{ old('admin_FullName', $admin->admin_FullName) }}" required
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+        </div>
+
+        <div>
+            <label for="user_Email" class="block text-sm font-medium text-gray-700">Email Address</label>
+            <input type="email" name="user_Email" id="user_Email" value="{{ old('user_Email', $user->user_Email) }}" required
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="admin_PhoneNumber" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                <input type="text" name="admin_PhoneNumber" id="admin_PhoneNumber" value="{{ old('admin_PhoneNumber', $admin->admin_PhoneNumber) }}" required
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
             </div>
-
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label for="user_Email" style="font-weight: bold; display: block; margin-bottom: 6px;">Email</label>
-                <input type="email" name="user_Email" id="user_Email"
-                       value="{{ $user->user_Email }}" required
-                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;">
+            <div>
+                <label for="admin_Age" class="block text-sm font-medium text-gray-700">Age</label>
+                <input type="number" name="admin_Age" id="admin_Age" value="{{ old('admin_Age', $admin->admin_Age) }}" required
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
             </div>
+        </div>
 
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label for="admin_PhoneNumber" style="font-weight: bold; display: block; margin-bottom: 6px;">Phone Number</label>
-                <input type="text" name="admin_PhoneNumber" id="admin_PhoneNumber"
-                       value="{{ $admin->admin_PhoneNumber }}" required
-                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;">
-            </div>
+        <div>
+            <label for="admin_Address" class="block text-sm font-medium text-gray-700">Address</label>
+            <textarea name="admin_Address" id="admin_Address" rows="4" required
+                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">{{ old('admin_Address', $admin->admin_Address) }}</textarea>
+        </div>
 
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label for="admin_Age" style="font-weight: bold; display: block; margin-bottom: 6px;">Age</label>
-                <input type="number" name="admin_Age" id="admin_Age"
-                       value="{{ $admin->admin_Age }}" required
-                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;">
-            </div>
-
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label for="admin_Address" style="font-weight: bold; display: block; margin-bottom: 6px;">Address</label>
-                <textarea name="admin_Address" id="admin_Address" required
-                          style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;">{{ $admin->admin_Address }}</textarea>
-            </div>
-
-            <button type="submit" style="
-                background: #007bff;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 16px;">
+        <div class="flex items-center gap-4 pt-4 border-t">
+            <button type="submit"
+                    class="py-2 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all">
                 Save Changes
             </button>
-            <a href="{{ route('admin.profile') }}" style="
-                background: #6c757d;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                text-decoration: none;
-                display: inline-block;
-                margin-left: 10px;
-                font-size: 16px;">
+            <a href="{{ route('admin.profile') }}"
+               class="py-2 px-6 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all">
                 Cancel
             </a>
-        </form>
+        </div>
+    </form>
+</div>
+
+{{-- =============================================== --}}
+{{-- NEW: Change Password Form --}}
+{{-- =============================================== --}}
+<div class="bg-white rounded-xl shadow-md border border-gray-100 p-10 w-4/5 mx-auto mt-10 relative">
+    <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold text-gray-800">Change Your Password</h2>
+        <p class="text-gray-500">Update your password below.</p>
     </div>
+
+    <form action="{{ route('admin.password.update') }}" method="POST" class="space-y-6">
+        @csrf
+        
+        <div>
+            <label for="current_password" class="block text-sm font-medium text-gray-700">Current Password</label>
+            <input type="password" name="current_password" id="current_password" required
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+        </div>
+
+        <div>
+            <label for="new_password" class="block text-sm font-medium text-gray-700">New Password</label>
+            <input type="password" name="new_password" id="new_password" required
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+        </div>
+
+        <div>
+            <label for="new_password_confirmation" class="block text-sm font-medium text-gray-700">Confirm New Password</label>
+            <input type="password" name="new_password_confirmation" id="new_password_confirmation" required
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+        </div>
+
+        <div class="flex items-center gap-4 pt-4">
+            <button type="submit"
+                    class="py-2 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all">
+                Change Password
+            </button>
+        </div>
+    </form>
+</div>
 @endsection
+
+@push('scripts')
+{{-- SweetAlert2 for success messages --}}
+@if(session('success'))
+    <script>
+        Swal.fire({
+            title: 'Success!',
+            text: "{{ session('success') }}",
+            icon: 'success',
+            confirmButtonColor: '#f59e0b', // Amber
+            confirmButtonText: 'OK'
+        });
+    </script>
+@endif
+
+{{-- SweetAlert for PASSWORD errors --}}
+@if ($errors->password->any())
+    <script>
+        Swal.fire({
+            title: 'Password Change Failed',
+            html: `
+                <ul class="text-left list-disc list-inside">
+                    @foreach ($errors->password->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            `,
+            icon: 'error',
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Try Again'
+        });
+    </script>
+@endif
+@endpush

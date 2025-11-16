@@ -3,10 +3,18 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\Customer;
 use App\Models\Staff;
 USE App\Models\Administrator;
+use App\Models\Booking;
+use App\Models\Advertisement;
+use App\Models\Payment;
+use Carbon\Carbon;
+use App\Models\Rental;
+use App\Models\Applications;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -130,6 +138,39 @@ public function update(Request $request)
     return redirect()->route('customer.profile')->with('success', 'Profile updated successfully!');
 }
 
+public function updateCustomerPassword(Request $request)
+    {
+        $userId = session('user_id');
+        $user = User::where('userID', $userId)->first();
+
+        if (!$user) {
+             return redirect()->route('customer.profile.edit')
+                             ->with('error_password', 'User not found.');
+        }
+
+        // 1. Validate the form and put errors in the 'password' error bag
+        $request->validateWithBag('password', [
+            'current_password' => 'required',
+            'new_password' => 'required|string|min:6|confirmed', // 'confirmed' checks for 'new_password_confirmation'
+        ]);
+
+        // 2. Check if the current password is correct
+        if (!Hash::check($request->current_password, $user->user_Password)) {
+            // --- FAILURE ---
+            return redirect()->route('customer.profile.edit')
+                             ->withErrors(['current_password' => 'Your current password does not match.'], 'password')
+                             ->withInput();
+        }
+
+        // 3. Update the password
+        $user->user_Password = Hash::make($request->new_password);
+        $user->save();
+
+        // --- SUCCESS ---
+        // Redirect to the MAIN profile page with a success message
+        return redirect()->route('customer.profile')
+                         ->with('success', 'Password changed successfully!');
+    }
 /**
  * Delete customer account.
  */
@@ -148,6 +189,105 @@ public function destroy(Request $request)
 
     return redirect()->route('login')->with('success', 'Your account has been deleted successfully.');
 }
+
+// In app/Http/Controllers/ProfileController.php
+
+public function dashboard()
+{
+    $userId = session('user_id');
+    $now = Carbon::now('Asia/Kuala_Lumpur');
+
+    // 1. Get the customer
+    $customer = Customer::where('userID', $userId)->first();
+    if (!$customer) {
+        return redirect()->route('login')->with('error', 'Customer profile not found.');
+    }
+
+    // 2. Get Data for "Next Booking" panel
+    $nextBooking = Booking::with('field', 'slot')
+        ->where('booking.userID', $userId)
+        ->where('booking.booking_Status', 'paid') // Only find 'paid' bookings
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->where('slot.slot_Date', '>=', $now->toDateString())
+        ->where(function($query) use ($now) { // Ensure it hasn't already passed today
+            $query->where('slot.slot_Date', '>', $now->toDateString())
+                    ->orWhere(function($query) use ($now) {
+                        $query->where('slot.slot_Date', '=', $now->toDateString())
+                                ->where('slot.slot_Time', '>', $now->toTimeString());
+                    });
+        })
+        ->orderBy('slot.slot_Date', 'asc')
+        ->orderBy('slot.slot_Time', 'asc')
+        ->select('booking.*')
+        ->first();
+
+    // 3. Get Data for "Upcoming Bookings" table
+    $upcomingBookingsTable = Booking::with('field', 'slot')
+        ->where('booking.userID', $userId)
+        ->where('booking.booking_Status', 'paid') // Only 'paid'
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->where('slot.slot_Date', '>=', $now->toDateString())
+        ->orderBy('slot.slot_Date', 'asc')
+        ->orderBy('slot.slot_Time', 'asc')
+        ->select('booking.*')
+        ->take(3) // Get the next 3
+        ->get();
+    
+    // 4. Get Data for "Monthly Bookings" Chart
+    $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
+    $monthlyData = Booking::where('userID', $userId)
+        ->where('booking_Status', 'paid')
+        ->where('booking_CreatedAt', '>=', $sixMonthsAgo)
+        ->select(DB::raw('COUNT(*) as count'), DB::raw('DATE_FORMAT(booking_CreatedAt, "%Y-%m") as month'))
+        ->groupBy('month')->orderBy('month', 'asc')->get();
+
+    $chartLabels = [];
+    $chartData = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $monthKey = $now->copy()->subMonths($i)->format('Y-m');
+        $label = $now->copy()->subMonths($i)->format('M');
+        $chartLabels[] = $label;
+        
+        $data = $monthlyData->firstWhere('month', $monthKey);
+        $chartData[] = $data ? $data->count : 0;
+    }
+
+    // 5. Get Data for "Action Hub" (KPIs)
+    $kpi_totalBookings = Booking::where('userID', $userId)
+        ->where('booking_Status', 'paid')
+        ->count();
+    
+    $kpi_activeRentals = Rental::where('userID', $userId)
+        ->where('rental_Status', 'paid')
+        ->where('rental_EndDate', '>=', $now->toDateString())
+        ->count();
+
+    $kpi_newApplications = Applications::where('status', 'pending')
+        ->whereHas('advertisement', function ($query) use ($customer) {
+            $query->where('customerID', $customer->customerID);
+        })
+        ->count();
+
+    return view('Profile.customer.dashboard', [
+        'fullName' => $customer->customer_FullName,
+        
+        // Data for new Action Hub
+        'kpi_totalBookings' => $kpi_totalBookings,
+        'kpi_activeRentals' => $kpi_activeRentals,
+        'kpi_newApplications' => $kpi_newApplications,
+
+        // Data for other panels
+        'nextBooking' => $nextBooking,
+        'upcomingBookingsTable' => $upcomingBookingsTable,
+        
+        // --- THIS IS THE FIX ---
+        // We must encode the PHP arrays into JSON strings here
+        'chartLabels' => json_encode($chartLabels),
+        'chartData' => json_encode($chartData),
+        // --- END FIX ---
+    ]);
+}
+
 
 //ADMIN SECTION
 
@@ -234,6 +374,35 @@ public function updateAdmin(Request $request)
     return redirect()->route('admin.profile')->with('success', 'Profile updated successfully!');
 }
 
+public function updateAdminPassword(Request $request)
+    {
+        $userId = session('user_id');
+        $user = User::where('userID', $userId)->first();
+
+        // 1. Validate the form
+        $request->validateWithBag('password', [
+            'current_password' => 'required',
+            'new_password' => 'required|string|min:6|confirmed', // 'confirmed' checks for 'new_password_confirmation'
+        ]);
+
+        // 2. Check if the current password is correct
+        if (!Hash::check($request->current_password, $user->user_Password)) {
+            // --- FAILURE ---
+            return redirect()->route('admin.profile.edit')
+                             ->withErrors(['current_password' => 'Your current password does not match.'], 'password')
+                             ->withInput();
+        }
+
+        // 3. Update the password
+        $user->user_Password = Hash::make($request->new_password);
+        $user->save();
+
+        // --- SUCCESS ---
+        // Redirect to the MAIN profile page with a success message
+        return redirect()->route('admin.profile')
+                         ->with('success', 'Password changed successfully!');
+    }
+
 public function destroyAdmin(Request $request)
 {
     $userId = session('user_id');
@@ -252,7 +421,325 @@ public function destroyAdmin(Request $request)
     return redirect()->route('login')->with('success', 'Your account has been deleted successfully.');
 }
 
+//STAFF SECTION
 
+public function showStaffProfile(Request $request)
+    {
+        $userId = session('user_id');
+        $user = User::where('userID', $userId)->first();
+        $staff = Staff::where('userID', $userId)->first();
 
+        if (!$user || !$staff) {
+            return redirect()->route('staff.dashboard')->with('error', 'Profile not found.');
+        }
 
+        return view('Profile.staff.MainProfilePage', [
+            'staffID'     => $staff->staffID,
+            'fullName'    => $staff->staff_FullName,
+            'email'       => $user->user_Email,
+            'phoneNumber' => $staff->staff_PhoneNumber,
+            'age'         => $staff->staff_Age,
+            'address'     => $staff->staff_Address,
+            'job'         => $staff->staff_Job,
+        ]);
+    }
+
+    /**
+    * Show edit staff profile page.
+    */
+    public function editStaff()
+    {
+        $userId = session('user_id');
+        $user = User::where('userID', $userId)->first();
+        $staff = Staff::where('userID', $userId)->first();
+
+        if (!$user || !$staff) {
+            // --- THIS IS THE FIX ---
+            return redirect()->route('staff.profile')->with('error', 'Profile not found.');
+        }
+
+        $fullName = $staff->staff_FullName;
+        return view('Profile.staff.editPage', compact('user', 'staff', 'fullName'));
+    }
+
+    /**
+    * Update staff profile information.
+    */
+    public function updateStaff(Request $request)
+    {
+        $userId = session('user_id');
+        $user = User::where('userID', $userId)->first();
+        $staff = Staff::where('userID', $userId)->first();
+
+        if (!$user || !$staff) {
+            // --- THIS IS THE FIX ---
+            return redirect()->route('staff.profile')->with('error', 'Profile not found.');
+        }
+
+        $request->validate([
+            'staff_FullName' => 'required|string|max:255',
+            'user_Email' => ['required', 'email', 'max:255', Rule::unique('user', 'user_Email')->ignore($userId, 'userID')],
+            'staff_PhoneNumber' => 'required|string|max:20',
+            'staff_Age' => 'required|integer|min:18|max:100',
+            'staff_Address' => 'required|string|max:255',
+        ]);
+
+        $user->update(['user_Email' => $request->user_Email]);
+        
+        $staff->update($request->only([
+            'staff_FullName', 
+            'staff_PhoneNumber', 
+            'staff_Age', 
+            'staff_Address'
+        ]));
+
+        // --- THIS IS THE FIX ---
+        return redirect()->route('staff.profile')->with('success', 'Profile updated successfully!');
+    }
+
+    /**
+     * NEW: Update staff password.
+     */
+    // In app/Http/Controllers/ProfileController.php
+
+public function updateStaffPassword(Request $request)
+{
+    $userId = session('user_id');
+    $user = User::where('userID', $userId)->first();
+
+    if (!$user) {
+         return redirect()->route('staff.profile.edit')
+                         ->with('error_password_alert', 'User not found.'); // Use a new session key for alerts
+    }
+
+    // 1. Validate the form and put errors in the 'password' error bag
+    $request->validateWithBag('password', [
+        'current_password' => 'required',
+        'new_password' => 'required|string|min:6|confirmed',
+    ]);
+
+    // 2. Check if the current password is correct
+    if (!Hash::check($request->current_password, $user->user_Password)) {
+        // --- FAILURE 1 ---
+        // Send a specific error message back to the 'password' error bag
+        return redirect()->route('staff.profile.edit')
+                         ->withErrors(['current_password' => 'Your current password does not match.'], 'password')
+                         ->withInput();
+    }
+
+    // 3. Update the password
+    $user->user_Password = Hash::make($request->new_password);
+    $user->save();
+
+    // --- SUCCESS ---
+    // Redirect to the MAIN profile page with a success message
+    return redirect()->route('staff.profile')
+                     ->with('success', 'Password changed successfully!');
+}
+
+    /**
+    * Delete staff account.
+    */
+    public function destroyStaff(Request $request)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Session expired. Please log in again.');
+        }
+
+        // Add deletion for related records if necessary
+        Staff::where('userID', $userId)->delete();
+        User::where('userID', $userId)->delete();
+        
+        $request->session()->flush();
+
+        return redirect()->route('login')->with('success', 'Your account has been deleted successfully.');
+    }
+    
+
+    // In app/Http/Controllers/ProfileController.php
+
+// In app/Http/Controllers/ProfileController.php
+
+public function dashboardStaff()
+{
+    $now = Carbon::now('Asia/Kuala_Lumpur');
+    $today = $now->toDateString();
+
+    // 1. Get Staff's name for the header
+    $fullName = 'Staff'; // Default
+    $staff = Staff::where('userID', session('user_id'))->first();
+    if ($staff) {
+        $fullName = $staff->staff_FullName;
+    }
+
+    // 2. Get Data for KPI Cards
+    $kpi_pendingApprovals = Rental::where('return_Status', 'requested')->count();
+
+    $kpi_activeBookings = Booking::where('booking_Status', 'paid')
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->where('slot.slot_Date', '>=', $today)
+        ->count();
+        
+    $kpi_currentRentals = Rental::where('rental_Status', 'paid')
+        ->where('rental_StartDate', '<=', $today)
+        ->where('rental_EndDate', '>=', $today)
+        ->count();
+
+    // 3. Get Data for "Pending Tasks" list
+    $pendingTasks = Rental::with('customer', 'item')
+        ->where('return_Status', 'requested') 
+        ->latest('rental_EndDate') 
+        ->take(3) 
+        ->get();
+        
+    // 4. NEW: Get Data for "Upcoming Bookings" table
+    $upcomingBookings = Booking::with('user', 'field', 'slot')
+        ->where('booking_Status', 'paid')
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->where('slot.slot_Date', '>=', $today)
+        ->orderBy('slot.slot_Date', 'asc')
+        ->orderBy('slot.slot_Time', 'asc')
+        ->select('booking.*')
+        ->take(4) // Get the next 4
+        ->get();
+        
+    // 5. NEW: Get Data for "Monthly Bookings" Chart
+    $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
+    $monthlyData = Booking::where('booking_Status', 'paid')
+        ->where('booking_CreatedAt', '>=', $sixMonthsAgo)
+        ->select(DB::raw('COUNT(*) as count'), DB::raw('DATE_FORMAT(booking_CreatedAt, "%Y-%m") as month'))
+        ->groupBy('month')->orderBy('month', 'asc')->get();
+
+    $chartLabels = [];
+    $chartData = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $monthKey = $now->copy()->subMonths($i)->format('Y-m');
+        $label = $now->copy()->subMonths($i)->format('M');
+        $chartLabels[] = $label;
+        
+        $data = $monthlyData->firstWhere('month', $monthKey);
+        $chartData[] = $data ? $data->count : 0;
+    }
+
+    // 6. Pass all data to the view
+    return view('Profile.staff.dashboard', [
+        'fullName' => $fullName,
+        'kpi_pendingApprovals' => $kpi_pendingApprovals,
+        'kpi_activeBookings' => $kpi_activeBookings,
+        'kpi_currentRentals' => $kpi_currentRentals,
+        'pendingTasks' => $pendingTasks,
+        'upcomingBookings' => $upcomingBookings,
+        'chartLabels' => json_encode($chartLabels),
+        'chartData' => json_encode($chartData),
+    ]);
+}
+
+// In app/Http/Controllers/ProfileController.php
+
+public function dashboardAdmin()
+{
+    $userId = session('user_id');
+    $now = Carbon::now('Asia/Kuala_Lumpur');
+    $startOfMonth = $now->copy()->startOfMonth();
+    $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
+
+    // 1. Get Admin's name
+    $admin = Administrator::where('userID', $userId)->first();
+    $fullName = $admin ? $admin->admin_FullName : 'Administrator';
+
+    // 2. Get Data for KPI Cards (This Month)
+    $kpi_totalRevenue = Payment::whereIn('payment_Status', ['paid', 'paid_balance', 'paid_balance (cash)'])
+        ->where('created_at', '>=', $startOfMonth)
+        ->sum('payment_Amount');
+
+    $kpi_totalBookings = Booking::whereIn('booking_Status', ['paid', 'completed'])
+        ->where('booking_CreatedAt', '>=', $startOfMonth)
+        ->count();
+
+    $kpi_totalRentals = Rental::where('rental_Status', 'paid')
+        ->where('rental_StartDate', '>=', $startOfMonth)
+        ->count();
+    
+    // --- 'kpi_newCustomers' query is permanently removed ---
+
+    // 3. Get Data for Revenue Chart (Last 6 Months)
+    $bookingRevenue = Booking::where('booking.booking_Status', 'paid')
+        ->where('booking.booking_CreatedAt', '>=', $sixMonthsAgo)
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->select(DB::raw('SUM(slot.slot_Price * 0.20) as total'), DB::raw('DATE_FORMAT(booking.booking_CreatedAt, "%Y-%m") as month'))
+        ->groupBy('month')->get()->keyBy('month');
+    
+    $balanceRevenue = Payment::where('payment_Status', 'paid_balance')
+        ->where('created_at', '>=', $sixMonthsAgo)
+        ->select(DB::raw('SUM(payment_Amount) as total'), DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'))
+        ->groupBy('month')->get()->keyBy('month');
+
+    $rentalRevenue = Rental::where('rental.rental_Status', 'paid')
+        ->where('rental.rental_StartDate', '>=', $sixMonthsAgo)
+        ->join('item', 'rental.itemID', '=', 'item.itemID')
+        ->select(
+            DB::raw('SUM(rental.quantity * item.item_Price * (DATEDIFF(rental.rental_EndDate, rental.rental_StartDate) + 1)) as total'),
+            DB::raw('DATE_FORMAT(rental.rental_StartDate, "%Y-%m") as month')
+        )
+        ->groupBy('month')
+        ->get()->keyBy('month');
+
+    $chartLabels = [];
+    $chartBookingData = [];
+    $chartRentalData = [];
+
+    for ($i = 5; $i >= 0; $i--) {
+        $month = $now->copy()->subMonths($i);
+        $monthKey = $month->format('Y-m');
+        $chartLabels[] = $month->format('M');
+        
+        $b_revenue = $bookingRevenue->get($monthKey) ? $bookingRevenue->get($monthKey)->total : 0;
+        $bal_revenue = $balanceRevenue->get($monthKey) ? $balanceRevenue->get($monthKey)->total : 0;
+        $chartBookingData[] = $b_revenue + $bal_revenue; 
+        
+        $chartRentalData[] = $rentalRevenue->get($monthKey) ? $rentalRevenue->get($monthKey)->total : 0;
+    }
+
+    // 4. Get Data for Field Popularity (Doughnut Chart)
+    $fieldPopularity = Booking::whereIn('booking_Status', ['paid', 'completed'])
+        ->join('field', 'booking.fieldID', '=', 'field.fieldID')
+        ->select('field.field_Label', DB::raw('COUNT(booking.bookingID) as count'))
+        ->groupBy('booking.fieldID', 'field.field_Label')
+        ->get();
+
+    // 5. Get Data for Action Lists
+    $pendingApprovals = Rental::with('customer', 'item')
+        ->where('return_Status', 'requested')
+        ->latest('rental_EndDate')
+        ->take(5)
+        ->get();
+    
+    // --- THIS IS THE FIX ---
+    // Sort by the primary key 'customerID' in descending order
+    $recentCustomers = Customer::with('user')
+        ->orderBy('customerID', 'desc') 
+        ->take(5)
+        ->get();
+    // --- END FIX ---
+
+    // 6. Pass all data to the view
+    return view('Profile.admin.dashboard', [
+        'fullName' => $fullName,
+        'kpi_totalRevenue' => $kpi_totalRevenue,
+        'kpi_totalBookings' => $kpi_totalBookings,
+        'kpi_totalRentals' => $kpi_totalRentals,
+        // 'kpi_newCustomers' is removed
+        
+        'chartLabels' => json_encode($chartLabels),
+        'chartBookingData' => json_encode($chartBookingData),
+        'chartRentalData' => json_encode($chartRentalData),
+
+        'fieldPopularityLabels' => json_encode($fieldPopularity->pluck('field_Label')),
+        'fieldPopularityData' => json_encode($fieldPopularity->pluck('count')),
+
+        'pendingApprovals' => $pendingApprovals,
+        'recentCustomers' => $recentCustomers,
+    ]);
+}
 }

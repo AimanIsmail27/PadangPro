@@ -1,113 +1,89 @@
 @extends('layout.customer')
 
-@section('content')
-<style>
-    .main {
-        padding: 30px;
-    }
-    .profile-section {
-        background: #1c2d6e;
-        border-radius: 8px;
-        height: 120px;
-        position: relative;
-    }
-    .profile-header {
-        color: white;
-        font-size: 20px;
-        font-weight: bold;
-        padding: 20px 30px;
-    }
-    .profile-card {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        padding: 30px;
-        width: 80%;
-        margin: 0 auto;
-        position: relative;
-        top: -40px;
-    }
-    .form-group {
-        margin-bottom: 15px;
-    }
-    .form-group label {
-        font-weight: bold;
-        display: block;
-        margin-bottom: 6px;
-    }
-    .form-group input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        font-size: 14px;
-    }
-    .save-btn {
-        background: #007bff;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 16px;
-    }
-    .cancel-btn {
-        background: #6c757d;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        cursor: pointer;
-        margin-left: 10px;
-        font-size: 16px;
-    }
-</style>
+@section('title', 'Edit Booking')
 
-<div class="main">
-    <!-- Blue header -->
-    <div class="profile-section">
-        <div class="profile-header">EDIT BOOKING</div>
+@section('content')
+
+<div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">Edit Booking</h1>
+    <p class="mt-2 text-indigo-100">Update your contact details for this booking.</p>
+</div>
+
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-8 md:p-10 w-11/12 mx-auto -mt-16 relative">
+
+    <div class="mb-8 p-6 border rounded-xl bg-slate-50">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Slot Details</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+            <div>
+                <p class="text-sm text-gray-500">Field</p>
+                <p class="text-lg font-semibold text-gray-900">{{ $booking->field->field_Label }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Price</p>
+                <p class="text-lg font-semibold text-gray-900">RM {{ number_format($booking->slot->slot_Price, 2) }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Date</p>
+                <p class="text-lg font-semibold text-gray-900">{{ \Carbon\Carbon::parse($booking->slot->slot_Date)->format('d M Y') }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Time</p>
+                <p class="text-lg font-semibold text-gray-900">{{ \Carbon\Carbon::parse($booking->slot->slot_Time)->format('h:i A') }}</p>
+            </div>
+        </div>
     </div>
 
-    <!-- White card with details + form -->
-    <div class="profile-card">
-        <!-- Slot & Field Details -->
-        <div class="mb-6">
-            <h2 class="text-lg font-bold mb-4">Slot Details</h2>
-            <p><strong>Date:</strong> {{ \Carbon\Carbon::parse($booking->slot->slot_Date)->format('d M Y') }}</p>
-            <p><strong>Time:</strong> {{ $booking->slot->slot_Time ?? '-' }}</p>
-            <p><strong>Field:</strong> {{ $booking->field->field_Label }}</p>
-            <p><strong>Price:</strong> RM {{ number_format($booking->slot->slot_Price, 2) }}</p>
+    @if ($errors->any())
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline">Please fix the following issues:</span>
+            <ul class="mt-3 list-disc list-inside text-sm">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <h2 class="text-xl font-bold text-gray-800 mb-6">Update Your Contact Information</h2>
+
+    <form action="{{ route('booking.update', $booking->bookingID) }}" method="POST" class="space-y-6">
+        @csrf
+        @method('PUT')
+
+        <div>
+            <label for="booking_Name" class="block text-sm font-medium text-gray-700">Full Name</label>
+            <input type="text" name="booking_Name" id="booking_Name" value="{{ old('booking_Name', $booking->booking_Name) }}" 
+                   class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
         </div>
 
-        <!-- Edit Booking Form -->
-        <form action="{{ route('booking.update', $booking->bookingID) }}" method="POST">
-            @csrf
-            @method('PUT')
+        <div>
+            <label for="booking_Email" class="block text-sm font-medium text-gray-700">Email</label>
+            <input type="email" name="booking_Email" id="booking_Email" value="{{ old('booking_Email', $booking->booking_Email) }}" 
+                   class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+        </div>
 
-            <div class="form-group">
-                <label for="fullName">Full Name</label>
-                <input type="text" name="fullName" id="fullName" value="{{ old('fullName', $booking->booking_Name) }}" required>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="booking_PhoneNumber" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                <input type="text" name="booking_PhoneNumber" id="booking_PhoneNumber" value="{{ old('booking_PhoneNumber', $booking->booking_PhoneNumber) }}" 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
             </div>
-
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" name="email" id="email" value="{{ old('email', $booking->booking_Email) }}" required>
+            <div>
+                <label for="booking_BackupNumber" class="block text-sm font-medium text-gray-700">Backup Phone Number (Optional)</label>
+                <input type="text" name="booking_BackupNumber" id="booking_BackupNumber" value="{{ old('booking_BackupNumber', $booking->booking_BackupNumber) }}" 
+                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
             </div>
+        </div>
 
-            <div class="form-group">
-                <label for="phoneNumber">Phone Number</label>
-                <input type="text" name="phoneNumber" id="phoneNumber" value="{{ old('phoneNumber', $booking->booking_PhoneNumber) }}" required>
-            </div>
-
-            <div class="form-group">
-                <label for="backupPhone">Backup Phone Number</label>
-                <input type="text" name="backupPhone" id="backupPhone" value="{{ old('backupPhone', $booking->booking_BackupNumber) }}">
-            </div>
-
-            <button type="submit" class="save-btn">Save Changes</button>
-            <a href="{{ route('customer.dashboard') }}" class="cancel-btn">Cancel Booking</a>
-        </form>
-    </div>
+        <div class="flex items-center gap-4 pt-6 border-t">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all transform hover:scale-105">
+                Save Changes
+            </button>
+            <a href="{{ route('customer.dashboard') }}" class="text-gray-600 hover:text-gray-900 font-medium">
+                Cancel
+            </a>
+        </div>
+    </form>
 </div>
 @endsection

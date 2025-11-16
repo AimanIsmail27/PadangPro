@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\Payment;
+use App\Models\User;
+use Carbon\Carbon;
 use App\Models\Booking;
 use App\Models\Rental;
 use Illuminate\Support\Facades\Log;
@@ -18,44 +20,52 @@ class PaymentController extends Controller
     {
         $booking = Booking::with('slot', 'field')->where('bookingID', $bookingID)->firstOrFail();
 
-        // Example: Payment amount from slot price
-        // Only 20% deposit required
-        // $deposit = $booking->slot->slot_Price * 0.20; // ACTUAL FORMULA
-        $deposit = 1; // FOR TESTING PURPOSES
+        $deposit = $booking->slot->slot_Price * 0.20; // ACTUAL FORMULA
+        //$deposit = 1; // FOR TESTING PURPOSES
         $amount = $deposit * 100; // ToyyibPay uses cents
 
         // ToyyibPay API request
-        $response = Http::asForm()->post('https://toyyibpay.com/index.php/api/createBill', [
-            'userSecretKey'            => env('TOYYIBPAY_SECRET'),
-            'categoryCode'             => env('TOYYIBPAY_CATEGORY'),
-            'billName'                 => 'PadangPro Booking',
-            'billDescription'          => 'Payment for booking ' . $booking->bookingID,
-            'billPriceSetting'         => 1,
-            'billPayorInfo'            => 1,
-            'billAmount'               => $amount,
-            'billReturnUrl'            => route('payment.return'),
-            'billCallbackUrl'          => route('payment.callback'),
-            'billExternalReferenceNo'  => $booking->bookingID,
-            'billTo'                   => $booking->booking_Name,
-            'billEmail'                => $booking->booking_Email,
-            'billPhone'                => $booking->booking_PhoneNumber,
+        // --- CHANGE 1: Use the DEV URL ---
+        $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
+            // --- CHANGE 2: Use your DEV credentials ---
+            'userSecretKey'         => env('TOYYIBPAY_SECRET_DEV'),
+            'categoryCode'          => env('TOYYIBPAY_CATEGORY_RENTAL'), // Use your dev category
+            // --- END CHANGES ---
+            'billName'              => 'PadangPro Booking',
+            'billDescription'       => 'Payment for booking ' . $booking->bookingID,
+            'billPriceSetting'      => 1,
+            'billPayorInfo'         => 1,
+            'billAmount'            => $amount,
+            'billReturnUrl'         => route('payment.return'),
+            'billCallbackUrl'       => route('payment.callback'),
+            'billExternalReferenceNo' => $booking->bookingID,
+            'billTo'                => $booking->booking_Name,
+            'billEmail'             => $booking->booking_Email,
+            'billPhone'             => $booking->booking_PhoneNumber,
         ]);
+
+        // Add error handling to prevent "array offset on value of type null"
+        if (!$response->successful() || !isset($response->json()[0]['BillCode'])) {
+            Log::error('ToyyibPay (DEV) initial deposit creation failed.', ['response' => $response->body()]);
+            return redirect()->route('booking.confirmation', ['bookingID' => $bookingID])
+                             ->with('error', 'Could not create payment. Please try again later.');
+        }
 
         $bill = $response->json()[0];
 
         // Save into payment table
         Payment::create([
-            'paymentID'         => 'PAY' . uniqid(),
-            'payer_Name'        => $booking->booking_Name,
-            'payer_BankAccount' => null, // will be updated later in callback with refno
-            'payment_Amount'    => $deposit,
-            'payment_Status'    => 'pending',
-            'bookingID'         => $booking->bookingID,
-            'userID'            => $booking->userID,
+            'paymentID'       => 'PAY' . uniqid(),
+            'payer_Name'      => $booking->booking_Name,
+            'payer_BankAccount' => null,
+            'payment_Amount'  => $deposit,
+            'payment_Status'  => 'pending',
+            'bookingID'       => $booking->bookingID,
+            'userID'          => $booking->userID,
         ]);
 
-        // Redirect user to ToyyibPay payment page
-        return redirect('https://toyyibpay.com/' . $bill['BillCode']);
+        // --- CHANGE 3: Redirect user to the DEV ToyyibPay URL ---
+        return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $bill['BillCode']);
     }
 
     /**
@@ -75,11 +85,11 @@ class PaymentController extends Controller
                     $payment->update(['payment_Status' => 'paid']);
                     Booking::where('bookingID', $bookingID)->update(['booking_Status' => 'paid']);
                     return redirect()->route('booking.view')
-                        ->with('success', 'Payment successful!');
+                        ->with('payment_success', 'Payment successful!');
                 } else {
                     $payment->update(['payment_Status' => 'failed']);
-                    return redirect()->route('booking.confirmation', ['bookingID' => $bookingID])
-                        ->with('error', 'Your payment was cancelled or failed. You can try again.');
+                    return redirect()->route('booking.view')
+                        ->with('error', 'Your payment was cancelled or failed. Please try again.');
                 }
             }
         }
@@ -237,6 +247,194 @@ public function rentalPaymentCallback(Request $request)
 
     return response()->json(['message' => 'Rental callback processed']);
 }
+
+/////////////////////////////////////////////////
+//BALANCE PAYMENT PART
+/////////////////////////////////////////////////
+/**
+     * Create a ToyyibPay bill for the 80% BALANCE payment.
+     */
+    public function createBalancePayment(Request $request, $bookingID)
+    {
+        $booking = Booking::with('slot', 'field')->where('bookingID', $bookingID)->firstOrFail();
+
+        // 1. Calculate the 80% balance
+        $balance = $booking->slot->slot_Price * 0.80; // ACTUAL FORMULA
+        //$balance = 1.00; // FOR TESTING (RM 1.00)
+        
+        $amount = $balance * 100; // ToyyibPay uses cents
+
+        // 2. Create the ToyyibPay bill
+         $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
+            'userSecretKey'         => env('TOYYIBPAY_SECRET_DEV'),
+            'categoryCode'          => env('TOYYIBPAY_CATEGORY_RENTAL'),
+            'billName'              => 'PadangPro Balance Payment',
+            'billDescription'       => 'Balance payment for booking ' . $booking->bookingID,
+            'billPriceSetting'      => 1,
+            'billPayorInfo'         => 1,
+            'billAmount'            => $amount,
+            'billReturnUrl'         => route('payment.return.balance'),
+            'billCallbackUrl'       => route('payment.callback.balance'),
+            'billExternalReferenceNo' => $booking->bookingID,
+            'billTo'                => $booking->booking_Name,
+            'billEmail'             => $booking->booking_Email,
+            'billPhone'             => $booking->booking_PhoneNumber,
+        ]);
+
+        $bill = $response->json()[0];
+
+        // 3. Create a NEW payment record for this balance
+        Payment::create([
+            'paymentID'       => 'PAY' . uniqid(),
+            'payer_Name'      => $booking->booking_Name,
+            'payment_Amount'  => $balance,
+            'payment_Status'  => 'pending_balance', // A new status for this type of payment
+            'bookingID'       => $booking->bookingID,
+            'userID'          => $booking->userID,
+        ]);
+
+        // 4. Redirect to payment page
+        return redirect(env('TOYYIBPAY_URL_DEV') .'/' . $bill['BillCode']);
+        
+
+    }
+
+    /**
+     * Handle return (user-facing) for BALANCE payment
+     */
+    public function paymentReturnBalance(Request $request)
+    {
+        $status    = $request->status_id ?? $request->status;
+        $bookingID = $request->order_id ?? $request->billExternalReferenceNo ?? null;
+        $refNo     = $request->refno ?? null; // Get the transaction ref no
+
+        if (!$bookingID) {
+            return redirect()->route('booking.view')->with('error', 'Payment status could not be verified.');
+        }
+
+        if ($status == 1) {
+            // --- THIS IS THE FIX ---
+            // Manually update the database on return, because callback won't work on localhost
+            
+            // 1. Find the 'pending_balance' payment
+            $payment = Payment::where('bookingID', $bookingID)
+                              ->where('payment_Status', 'pending_balance')
+                              ->latest()->first();
+
+            if ($payment) {
+                // 2. Update the Payment record
+                $payment->update([
+                    'payment_Status'    => 'paid_balance',
+                    'payer_BankAccount' => $refNo
+                ]);
+
+                // 3. Update the Booking status to 'completed'
+                Booking::where('bookingID', $bookingID)->update([
+                    'booking_Status' => 'completed'
+                ]);
+            }
+            // --- END FIX ---
+            
+            // Success!
+            return redirect()->route('booking.view')
+                       ->with('success', 'Balance payment successful! Your booking is now complete.');
+        } else {
+            // Failed or Cancelled
+            // Find and update the payment status to 'failed' for your records
+            $payment = Payment::where('bookingID', $bookingID)
+                              ->where('payment_Status', 'pending_balance')
+                              ->latest()->first();
+            if ($payment) {
+                 $payment->update(['payment_Status' => 'failed']);
+            }
+            
+            return redirect()->route('booking.view')
+                       ->with('error', 'Your balance payment was cancelled or failed. Please try again.');
+        }
+    }
+
+    /**
+     * Handle callback (server-to-server) for BALANCE payment
+     */
+    public function paymentCallbackBalance(Request $request)
+    {
+        $bookingID = $request->billExternalReferenceNo;
+        $status    = $request->status; // 1=paid
+        $refNo     = $request->refno ?? null;
+
+        $payment = Payment::where('bookingID', $bookingID)
+                          ->where('payment_Status', 'pending_balance')
+                          ->latest()->first();
+
+        if ($payment && $status == 1) {
+            // 1. Update the Payment record
+            $payment->update([
+                'payment_Status'    => 'paid_balance',
+                'payer_BankAccount' => $refNo
+            ]);
+
+            // 2. Update the Booking status to 'completed'
+            Booking::where('bookingID', $bookingID)->update([
+                'booking_Status' => 'completed'
+            ]);
+        }
+
+        return response()->json(['message' => 'Callback processed']);
+    }
+
+
+    public function markAsCompleted(Request $request, $bookingID)
+    {
+        // Get user type from session
+        $userType = session('user_type');
+        
+        // Ensure only staff or admin can do this
+        if ($userType !== 'staff' && $userType !== 'administrator') {
+            return redirect()->route('customer.dashboard')->with('error', 'Unauthorized action.');
+        }
+
+        $booking = Booking::with('slot')->findOrFail($bookingID);
+
+        // Check if the booking is in the correct status to be completed
+        if ($booking->booking_Status == 'paid') {
+            
+            // Update the booking status
+            $booking->update(['booking_Status' => 'completed']);
+
+            // Create a new payment record for this cash payment
+            Payment::create([
+                'paymentID'       => 'PAY' . uniqid(),
+                'payer_Name'      => $booking->booking_Name,
+                'payment_Amount'  => $booking->slot->slot_Price * 0.80, // Record the 80% balance
+                'payment_Status'  => 'paid_balance (cash)', // Special status for cash
+                'bookingID'       => $booking->bookingID,
+                'userID'          => $booking->userID,
+                'payer_BankAccount' => 'CASH_AT_COUNTER' // Record how it was paid
+            ]);
+            
+            $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
+
+            return redirect()->route($redirectRoute)
+                             ->with('success', 'Booking ' . $bookingID . ' has been marked as completed.');
+
+        } elseif ($booking->booking_Status == 'completed') {
+             $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
+             return redirect()->route($redirectRoute)
+                             ->with('error', 'This booking is already completed.');
+        } else {
+             $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
+             return redirect()->route($redirectRoute)
+                             ->with('error', 'This booking is not in a valid state to be completed.');
+        }
+    }
+
+
+
+
+
+
+
+
 
 
 }

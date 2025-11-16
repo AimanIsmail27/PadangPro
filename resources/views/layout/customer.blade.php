@@ -5,170 +5,124 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'PadangPro')</title>
     @vite('resources/css/app.css')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <style>
-        body {
-            margin: 0;
-            font-family: 'Poppins', sans-serif;
-            background-color: #f8f9fa;
-            display: flex;
+        /* New active state for the Slate/Indigo theme */
+        .sidebar-link.active {
+            background-color: #4f46e5; /* Indigo-600 */
+            color: #ffffff;
+            font-weight: 600;
         }
-
-        /* Sidebar */
-        aside {
-            width: 220px;
-            background: white; /* keep white */
-            color: #000;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            position: fixed;
-            top: 0;
-            left: 0;
+        .sidebar-link.active i {
+            color: #ffffff;
         }
-
-        aside .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin-bottom: 40px;
-        }
-
-        aside nav ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        aside nav ul li {
-            padding: 12px 0;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        aside nav ul li a {
-            color: #000;
-            text-decoration: none;
-            display: block;
-            transition: all 0.3s ease;
-        }
-
-        aside nav ul li a:hover {
-            background: #1E2A78; /* blue hover */
-            color: white;
-            border-radius: 8px;
-            padding-left: 10px;
-        }
-
-        /* Dropdown items */
-        .nav-item .dropdown-menu {
-            display: none;
-            position: relative;
-            margin-left: 15px;
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            padding-left: 10px;
-        }
-
+        /* Custom scrollbar */
+        .sidebar-nav::-webkit-scrollbar { width: 6px; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; } /* Slate-600 */
+        .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+        
+        /* Dropdown styles */
         .nav-item.dropdown:hover > .dropdown-menu {
             display: block;
         }
-
-        .nav-item .dropdown-menu .dropdown-item {
-            white-space: nowrap;
-            color: #000;
-            display: block;
-            padding: 8px 0;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-
-        .nav-item .dropdown-menu .dropdown-item:hover {
-            background: #1E2A78;
-            color: white;
-            border-radius: 6px;
-            padding-left: 8px;
-        }
-
-        /* Main Content */
-        main {
-            margin-left: 220px;
-            flex: 1;
-            padding: 20px 30px;
-        }
-
-        /* Topbar */
-        .topbar {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        /* Shared Blue Banner */
-        .welcome-banner {
-            background-color: #1E2A78;
-            color: white;
-            padding: 85px 30px;
-            border-radius: 10px;
-            font-size: 1.6rem;
-            font-weight: bold;
-            margin-bottom: 25px;
-            width: 100%;
-            box-sizing: border-box;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        .nav-item .dropdown-menu {
+            display: none;
+            margin-left: 1.5rem; /* 24px */
+            padding-left: 0.5rem; /* 8px */
         }
     </style>
 </head>
-<body>
-    <!-- Sidebar -->
-    <aside>
-        <div class="logo">PadangPro</div>
-        <nav>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a href="{{ route('customer.dashboard') }}">Dashboard</a></li>
-                <li class="nav-item"><a href="{{ route('customer.profile') }}">Profile</a></li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#">Booking</a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{{ route('booking.view') }}">Your Booking History</a></li>
-                        <li><a class="dropdown-item" href="{{ route('booking.page', 'F01') }}">Book Standard Field</a></li>
-                        <li><a class="dropdown-item" href="{{ route('booking.mini') }}">Book Mini Pitch</a></li>
-                    </ul>
+<body class="bg-slate-100 font-sans flex">
+
+    <aside class="bg-slate-800 text-slate-300 w-64 fixed top-0 left-0 h-full z-10 p-6 flex flex-col shadow-2xl">
+        <div class="logo flex items-center space-x-3 mb-12 px-2">
+            <img src="{{ asset('images/logoPadang.png') }}" alt="PadangPro Logo" class="w-10 h-10 object-contain rounded-full bg-white p-1">
+            <span class="text-white font-bold text-2xl tracking-tight">PadangPro</span>
+        </div>
+        
+        <nav class="flex-grow sidebar-nav overflow-y-auto">
+            <ul class="space-y-2">
+                <li class="nav-item">
+                    <a href="{{ route('customer.dashboard') }}" class="sidebar-link flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-all duration-200
+                        {{ (request()->routeIs('customer.dashboard')) ? 'active' : '' }}">
+                        <i class="bi bi-house-door-fill text-indigo-400"></i>
+                        <span>Dashboard</span>
+                    </a>
                 </li>
-                <li class="nav-item"><a href="{{ route('customer.rental.main') }}">Rental Item</a></li>
+                <li class="nav-item">
+                    <a href="{{ route('customer.profile') }}" class="sidebar-link flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-all duration-200
+                        {{ (request()->routeIs('customer.profile')) ? 'active' : '' }}">
+                        <i class="bi bi-person-fill text-indigo-400"></i>
+                        <span>Profile</span>
+                    </a>
+                </li>
+
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#">Matchmaking</a>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <a class="dropdown-item" href="{{ route('matchmaking.personal') }}">
-                                Your Advertisement
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ route('matchmaking.other') }}">
-                                Other Advertisement
-                            </a>
-                        </li>
+                    <a class="sidebar-link nav-link dropdown-toggle flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-all duration-200
+                        {{ (request()->routeIs('booking.*')) ? 'active' : '' }}" href="#">
+                        <i class="bi bi-calendar-check-fill text-indigo-400"></i>
+                        <span>Booking</span>
+                    </a>
+                    <ul class="dropdown-menu mt-2 space-y-1">
+                        <li><a class="sidebar-link dropdown-item block px-4 py-2 rounded-lg hover:bg-slate-700" href="{{ route('booking.view') }}">Your Booking History</a></li>
+                        <li><a class="sidebar-link dropdown-item block px-4 py-2 rounded-lg hover:bg-slate-700" href="{{ route('booking.page', 'F01') }}">Book Standard Pitch</a></li>
+                        <li><a class="sidebar-link dropdown-item block px-4 py-2 rounded-lg hover:bg-slate-700" href="{{ route('booking.mini') }}">Book Mini Pitch</a></li>
                     </ul>
                 </li>
 
-                <li class="nav-item"><a href="{{ route('customer.rating.main') }}">Rating and Review</a></li>
-                <li class="nav-item"><a href="{{ route('logout') }}">Logout</a></li>
+                <li class="nav-item">
+                    <a href="{{ route('customer.rental.main') }}" class="sidebar-link flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-all duration-200
+                        {{ (request()->routeIs('customer.rental.*')) ? 'active' : '' }}">
+                        <i class="bi bi-tags-fill text-indigo-400"></i>
+                        <span>Rental Items</span>
+                    </a>
+                </li>
+
+                <li class="nav-item dropdown">
+                    <a class="sidebar-link nav-link dropdown-toggle flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-all duration-200
+                        {{ (request()->routeIs('matchmaking.*')) ? 'active' : '' }}" href="#">
+                        <i class="bi bi-people-fill text-indigo-400"></i>
+                        <span>Matchmaking</span>
+                    </a>
+                    <ul class="dropdown-menu mt-2 space-y-1">
+                        <li><a class="sidebar-link dropdown-item block px-4 py-2 rounded-lg hover:bg-slate-700" href="{{ route('matchmaking.personal') }}">Your Advertisement</a></li>
+                        <li><a class="sidebar-link dropdown-item block px-4 py-2 rounded-lg hover:bg-slate-700" href="{{ route('matchmaking.other') }}">Other Advertisements</a></li>
+                    </ul>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{{ route('customer.rating.main') }}" class="sidebar-link flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-all duration-200
+                        {{ (request()->routeIs('customer.rating.*')) ? 'active' : '' }}">
+                        <i class="bi bi-star-fill text-indigo-400"></i>
+                        <span>Rating & Review</span>
+                    </a>
+                </li>
             </ul>
         </nav>
+
+        <div class="mt-auto pt-6 border-t border-slate-700">
+            <a href="{{ route('logout') }}" class="sidebar-link flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-400 hover:bg-red-600 hover:text-white transition-all duration-200">
+                <i class="bi bi-box-arrow-left"></i>
+                <span>Logout</span>
+            </a>
+        </div>
     </aside>
 
-    <!-- Main Content -->
-    <main>
-        <div class="topbar">
-            <div>Welcome, <strong>{{ $fullName ?? session('full_name', 'Customer') }}</strong></div>
-        </div>
+    <div class="ml-64 flex-1">
+        <header class="bg-white shadow-sm p-6 sticky top-0 z-5 border-b border-gray-200">
+            <div class="flex justify-end items-center">
+                <div class="text-gray-700 font-medium">
+                    Welcome, <strong>{{ $fullName ?? session('full_name', 'Customer') }}</strong>
+                </div>
+            </div>
+        </header>
 
-        @yield('content')
-    </main>
+        <main class="p-8">
+            @yield('content')
+        </main>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     @stack('scripts')
-
 </body>
 </html>

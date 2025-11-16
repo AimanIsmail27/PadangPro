@@ -6,248 +6,245 @@ use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\BookingController;
-use App\Http\Middleware\PreventBackHistory;
 use App\Http\Controllers\PaymentController; 
 use App\Http\Controllers\RentalController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\RatingController;
-use App\Http\Middleware\AuthSession; // Use your existing middleware
+use App\Http\Controllers\ReportController; // Fixed casing
+use App\Http\Middleware\PreventBackHistory;
+use App\Http\Middleware\AuthSession;
 
+// =================================================================
+// PUBLIC ROUTES (Visible to Everyone)
+// =================================================================
 
 Route::view('/', 'landing.home')->name('home');
 Route::view('/about', 'landing.about')->name('about');
+Route::get('/latest-reviews', [RatingController::class, 'getLatestReviews'])->name('reviews.latest');
 
+// --- Google Login ---
+Route::get('/login/google', [GoogleController::class, 'redirectToGoogle'])->name('login.google');
+Route::get('/login/google/callback', [GoogleController::class, 'handleGoogleCallback']);
 
-// Root page (redirect to login)
-//Route::get('/', function () {
-  //  return redirect()->route('login');
-//});
+// --- Payment Callbacks (Must be public/exempt from CSRF) ---
+Route::post('/payment/callback', [PaymentController::class, 'paymentCallback'])->name('payment.callback');
+Route::get('/payment/return', [PaymentController::class, 'paymentReturn'])->name('payment.return');
+Route::get('customer/rental/payment/return', [PaymentController::class, 'rentalPaymentReturn'])->name('customer.rental.payment.return');
+Route::post('customer/rental/payment/callback', [PaymentController::class, 'rentalPaymentCallback'])->name('customer.rental.payment.callback');
+Route::get('/payment/return-balance', [PaymentController::class, 'paymentReturnBalance'])->name('payment.return.balance');
+Route::post('/payment/callback-balance', [PaymentController::class, 'paymentCallbackBalance'])->name('payment.callback.balance');
 
-// Routes that should prevent going back after login/logout
+// =================================================================
+// AUTHENTICATION ROUTES (Login, Register, Logout)
+// =================================================================
+
+// --- Login & Registration (Guests) ---
 Route::middleware([PreventBackHistory::class])->group(function () {
-
-    // Login page with session check
     Route::get('/login', function () {
         if (session()->has('user_id') && session()->has('user_type')) {
-            return redirect()->route(session('user_type') . '.dashboard');
+            // Updated logic to handle admin dashboard name
+            $dashboardName = session('user_type') === 'administrator' ? 'administrator.dashboard' : session('user_type') . '.dashboard';
+            return redirect()->route($dashboardName);
         }
         return view('auth.login');
     })->name('login');
 
-    // Handle login
     Route::post('/login', [loginController::class, 'login'])->name('login.post');
-
-    // Logout
-    Route::get('/logout', [loginController::class, 'logout'])->name('logout');
 });
 
-// Secure dashboards with session check + prevent back
-Route::middleware([PreventBackHistory::class, AuthSession::class])
-    ->prefix('profile')
-    ->group(function () {
-        Route::get('/staff/dashboard', function () {
-            return view('Profile.staff.dashboard');
-        })->name('staff.dashboard');
-
-        Route::get('/staff/profile', [\App\Http\Controllers\ProfileController::class, 'showStaffProfile'])->name('staff.profile');
-
-        Route::get('/administrator/dashboard', function () {
-            return view('Profile.admin.dashboard');
-        })->name('administrator.dashboard');
-
-        Route::get('/admin/profile', [ProfileController::class, 'showAdminProfile'])->name('admin.profile');
-        Route::get('/admin/profile/edit', [ProfileController::class, 'editAdmin'])->name('admin.profile.edit');
-        Route::put('/admin/profile/update', [ProfileController::class, 'updateAdmin'])->name('admin.profile.update');
-        Route::delete('/admin/profile/delete', [ProfileController::class, 'destroyAdmin'])->name('admin.profile.delete');
-        
-        Route::get('/customer/dashboard', function () {
-            return view('Profile.customer.dashboard');
-        })->name('customer.dashboard');
-
-        Route::get('/customer/profile', [\App\Http\Controllers\ProfileController::class, 'showCustomerProfile'])->name('customer.profile');
-        Route::get('/customer/profile/edit', [ProfileController::class, 'edit'])->name('customer.profile.edit');
-        Route::post('/customer/profile/update', [ProfileController::class, 'update'])->name('customer.profile.update');
-        Route::delete('/customer/profile/delete', [ProfileController::class, 'destroy'])->name('customer.profile.delete');
-
-
-    });
-
-// Google Login
-Route::get('/login/google', [GoogleController::class, 'redirectToGoogle'])->name('login.google');
-Route::get('/login/google/callback', [GoogleController::class, 'handleGoogleCallback']);
-
-// Registration (not affected by prevent-back-history)
 Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
 Route::post('/register', [RegisterController::class, 'register'])->name('register.submit');
 
-// Staff registration (admin only)
-Route::get('/staff/register', [RegisterController::class, 'showStaffRegistrationForm'])->name('staff.register');
-Route::post('/register/staff', [RegisterController::class, 'registerStaff'])->name('staff.register.store');
 
-Route::get('/booking/view', [BookingController::class, 'viewBookings'])->name('booking.view');
+// =================================================================
+// AUTHENTICATED ROUTES (All users must be logged in)
+// =================================================================
 
-// Mini Pitch booking page
-Route::get('/booking/mini', [BookingController::class, 'showMiniFieldBooking'])->name('booking.mini');
+Route::middleware([AuthSession::class, PreventBackHistory::class])->group(function () {
 
+    // --- Logout ---
+    Route::get('/logout', [loginController::class, 'logout'])->name('logout');
 
-Route::get('/booking/{fieldID}', [BookingController::class, 'showBookingPage'])
-    ->name('booking.page');
+    // --- All Profile & Dashboard Routes ---
+    Route::prefix('profile')->group(function () {
+        
+        // --- Staff Routes ---
+        Route::middleware('role:staff')->group(function () {
+            Route::get('/staff/dashboard', [ProfileController::class, 'dashboardStaff'])->name('staff.dashboard');
+            Route::get('/staff/profile', [ProfileController::class, 'showStaffProfile'])->name('staff.profile');
+            Route::get('/staff/profile/edit', [ProfileController::class, 'editStaff'])->name('staff.profile.edit');
+            Route::post('/staff/profile/update', [ProfileController::class, 'updateStaff'])->name('staff.profile.update');
+            Route::delete('/staff/profile/delete', [ProfileController::class, 'destroyStaff'])->name('staff.profile.delete');
+            Route::post('/staff/password/update', [ProfileController::class, 'updateStaffPassword'])->name('staff.password.update');
+        });
 
-// Handle AJAX booking request
-Route::post('/booking/book', [BookingController::class, 'bookSlot'])
-    ->name('booking.book');
+        // --- Admin Routes ---
+        Route::middleware('role:administrator')->group(function () {
+            Route::get('/administrator/dashboard', [ProfileController::class, 'dashboardAdmin'])->name('administrator.dashboard');
+            Route::get('/admin/profile', [ProfileController::class, 'showAdminProfile'])->name('admin.profile');
+            Route::get('/admin/profile/edit', [ProfileController::class, 'editAdmin'])->name('admin.profile.edit');
+            Route::put('/admin/profile/update', [ProfileController::class, 'updateAdmin'])->name('admin.profile.update');
+            Route::delete('/admin/profile/delete', [ProfileController::class, 'destroyAdmin'])->name('admin.profile.delete');
+            Route::post('/admin/password/update', [ProfileController::class, 'updateAdminPassword'])->name('admin.password.update');
+        });
+        
+        // --- Customer Routes ---
+        Route::middleware('role:customer')->group(function () {
+            Route::get('/customer/dashboard', [ProfileController::class, 'dashboard'])->name('customer.dashboard');
+            Route::get('/customer/profile', [ProfileController::class, 'showCustomerProfile'])->name('customer.profile');
+            Route::get('/customer/profile/edit', [ProfileController::class, 'edit'])->name('customer.profile.edit');
+            Route::post('/customer/profile/update', [ProfileController::class, 'update'])->name('customer.profile.update');
+            Route::delete('/customer/profile/delete', [ProfileController::class, 'destroy'])->name('customer.profile.delete');
+            Route::post('/customer/password/update', [ProfileController::class, 'updateCustomerPassword'])->name('customer.password.update');
+        });
+    });
 
+    // --- CUSTOMER: Booking Routes ---
+    Route::prefix('booking')->name('booking.')->middleware('role:customer')->group(function () {
+        Route::get('/view', [BookingController::class, 'viewBookings'])->name('view');
+        Route::get('/mini', [BookingController::class, 'showMiniFieldBooking'])->name('mini');
+        Route::get('/field/{fieldID}', [BookingController::class, 'showBookingPage'])->name('page');
+        Route::post('/book', [BookingController::class, 'bookSlot'])->name('book');
+        Route::post('/store', [BookingController::class, 'store'])->name('store');
+        Route::get('/{slotID}/add', [BookingController::class, 'add'])->name('add');
+        Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');
+        Route::get('/{bookingID}/confirmation', [BookingController::class, 'confirmation'])->name('confirmation');
+        Route::put('/{bookingID}', [BookingController::class, 'update'])->name('update');
+        Route::delete('/{bookingID}/cancel', [BookingController::class, 'destroy'])->name('cancel');
+        Route::get('/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('slots.json');
+    });
 
+    // --- CUSTOMER: Payment Route ---
+    Route::middleware('role:customer')->group(function () {
+        Route::get('/payment/create/{bookingID}', [PaymentController::class, 'createPayment'])->name('payment.create');
+        Route::get('/payment/balance/{bookingID}', [PaymentController::class, 'createBalancePayment'])->name('payment.balance.create');
+    });
 
-Route::post('/booking/store', [BookingController::class, 'store'])->name('booking.store');
+    // --- CUSTOMER: Rental Routes ---
+    Route::prefix('customer/rental')->name('customer.rental.')->middleware('role:customer')->group(function() {
+        Route::get('/', [RentalController::class, 'indexCustomer'])->name('main');
+        Route::get('/rent/{itemID}', [RentalController::class, 'rentPage'])->name('rent');
+        Route::post('/rent/{itemID}', [RentalController::class, 'processRent'])->name('process');
+        Route::get('/check-availability/{itemID}', [RentalController::class, 'checkAvailability'])->name('checkAvailability');
+        Route::get('/confirmation/{rentalID}', [RentalController::class, 'showConfirmation'])->name('confirmation');
+        Route::post('/confirm', [RentalController::class, 'confirmBooking'])->name('confirm');
+        Route::get('/rental/{rentalID}/edit', [RentalController::class, 'editPage'])->name('edit');
+        Route::post('/rental/{rentalID}/update', [RentalController::class, 'updateRent'])->name('update');
+        Route::delete('/rental/{rentalID}', [RentalController::class, 'destroyCustomer'])->name('destroy');
+        Route::post('/{rentalID}/pay', [PaymentController::class, 'createRentalPayment'])->name('pay');
+        Route::get('/history', [RentalController::class, 'viewRentalHistory'])->name('history');
+        Route::post('/{rentalID}/request-approval', [RentalController::class, 'requestApproval'])->name('requestApproval');
+    });
 
-Route::get('/booking/{slotID}/add', [BookingController::class, 'add'])->name('booking.add');
+    // --- CUSTOMER: Matchmaking Routes ---
+    Route::prefix('matchmaking')->name('matchmaking.')->middleware('role:customer')->group(function () {
+        Route::get('/personal', [MatchController::class, 'personalAds'])->name('personal');
+        Route::get('/other', [MatchController::class, 'otherAds'])->name('other');
+        Route::get('/add', fn() => view('Matchmaking.addOfferPage'))->name('add');
+        Route::post('/store', [MatchController::class, 'store'])->name('store');
+        Route::get('/view/{adsID}', [MatchController::class, 'view'])->name('view');
+        Route::get('/edit/{adsID}', [MatchController::class, 'edit'])->name('edit');
+        Route::post('/update/{adsID}', [MatchController::class, 'update'])->name('update');
+        Route::delete('/destroy/{adsID}', [MatchController::class, 'destroy'])->name('destroy');
+        Route::get('/join/{adsID}', [MatchController::class, 'joinForm'])->name('joinForm');
+        Route::post('/join/{adsID}', [MatchController::class, 'joinStore'])->name('joinStore');
+    });
 
-Route::get('/booking/{booking}/edit', [BookingController::class, 'edit'])->name('booking.edit');
+    // --- CUSTOMER: Matchmaking Application Routes ---
+    Route::middleware('role:customer')->group(function () {
+        Route::post('/applications/{id}/accept', [MatchController::class, 'accept'])->name('applications.accept');
+        Route::post('/applications/{id}/reject', [MatchController::class, 'reject'])->name('applications.reject');
+    });
 
-Route::post('/booking/{bookingID}/payment', [BookingController::class, 'payment'])->name('booking.payment');
+    // --- CUSTOMER: Rating & Review Routes ---
+    Route::prefix('customer/rating')->name('customer.rating.')->middleware('role:customer')->group(function () {
+        Route::get('/', [RatingController::class, 'showCustomerRatings'])->name('main');
+        Route::get('/add', [RatingController::class, 'showAddReviewForm'])->name('add');
+        Route::post('/add', [RatingController::class, 'addNewReview'])->name('store');
+        Route::get('/edit/{ratingID}', [RatingController::class, 'showEditReviewForm'])->name('edit');
+        Route::post('/update/{ratingID}', [RatingController::class, 'updateReview'])->name('update');
+        Route::get('/delete/{ratingID}', [RatingController::class, 'deleteReview'])->name('delete');
+    });
 
-Route::get('/booking/{bookingID}/confirmation', [BookingController::class, 'confirmation'])
-     ->name('booking.confirmation');
+    // --- ADMIN: Booking Routes ---
+    Route::prefix('admin/booking')->name('admin.booking.')->middleware('role:administrator')->group(function () {
+        Route::get('/manage', [BookingController::class, 'showBookingPage'])->name('manage');
+        Route::get('/view-all', [BookingController::class, 'viewBookings'])->name('viewAll');
+        Route::get('/mini', [BookingController::class, 'showMiniFieldBooking'])->name('mini');
+        Route::get('/{slotID}/add', [BookingController::class, 'add'])->name('add');
+        Route::post('/store', [BookingController::class, 'store'])->name('store');
+        Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');
+        Route::put('/{bookingID}', [BookingController::class, 'update'])->name('update');
+        Route::delete('/{bookingID}/cancel', [BookingController::class, 'destroy'])->name('cancel');
+        Route::get('/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('slots.json');
+    });
 
-Route::put('/booking/{bookingID}', [BookingController::class, 'update'])->name('booking.update');
-
-
-Route::delete('/booking/{bookingID}/cancel', [BookingController::class, 'destroy'])->name('booking.cancel');
-
-
-
-// Create ToyyibPay bill and redirect
-Route::get('/payment/create/{bookingID}', [PaymentController::class, 'createPayment'])->name('payment.create');
-
-// Handle return (user-facing after payment)
-Route::get('/payment/return', [PaymentController::class, 'paymentReturn'])->name('payment.return');
-
-// Handle callback (server-to-server)
-Route::post('/payment/callback', [PaymentController::class, 'paymentCallback'])->name('payment.callback');
-
-// JSON feed for FullCalendar
-Route::get('/booking/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('booking.slots.json');
-Route::get('/booking/mini/slots-json', [BookingController::class, 'getMiniSlotsJson'])->name('booking.mini.slots.json');
-
-
-// Staff Rental Main Page
-Route::get('/staff/rental', [RentalController::class, 'index'])->name('staff.rental.main');
-
-// Add Rental Item Page
-Route::get('/staff/rental/add', function () {
-    return view('Rental.staff.addPage');
-})->name('staff.rental.add');
-
-
-Route::get('/staff/rentals/current', [RentalController::class, 'viewCurrent'])->name('staff.rentals.current');
-
-// Store Rental Item
-Route::post('/staff/rental/store', [RentalController::class, 'store'])->name('staff.rental.store');
-
-// Show all rentals with return_Status = requested
-Route::get('/staff/rentals/return-approval', [RentalController::class, 'viewReturnApprovals'])
-    ->name('staff.rentals.returnApproval');
-
-// Handle staff approval/rejection
-Route::post('/staff/rentals/return-approval/{rentalID}', [RentalController::class, 'updateReturnApproval'])
-    ->name('staff.rentals.updateReturnApproval');
-
-// Edit Item Page
-Route::get('/staff/rental/edit/{itemID}', [RentalController::class, 'edit'])->name('staff.rental.edit');
-
-// Update Item
-Route::put('/staff/rental/update/{itemID}', [RentalController::class, 'update'])->name('staff.rental.update');
-
-// Delete Rental Item
-Route::delete('/staff/rental/delete/{itemID}', [RentalController::class, 'destroy'])->name('staff.rental.delete');
-
-
-// ---------------- CUSTOMER RENTAL ROUTES ----------------
-Route::prefix('customer/rental')->name('customer.rental.')->group(function() {
-    Route::get('/', [RentalController::class, 'indexCustomer'])->name('main');
-    Route::get('/rent/{itemID}', [RentalController::class, 'rentPage'])->name('rent');
-    Route::post('/rent/{itemID}', [RentalController::class, 'processRent'])->name('process');
-    Route::get('/check-availability/{itemID}', [RentalController::class, 'checkAvailability'])->name('checkAvailability');
-    Route::get('/confirmation/{rentalID}', [RentalController::class, 'showConfirmation'])->name('confirmation');
-    Route::post('/confirm', [RentalController::class, 'confirmBooking'])->name('confirm');
-    Route::get('/rental/{rentalID}/edit', [RentalController::class, 'editPage'])->name('edit');
-    Route::post('/rental/{rentalID}/update', [RentalController::class, 'updateRent'])->name('update');
-    Route::delete('/rental/{rentalID}', [RentalController::class, 'destroyCustomer'])->name('destroy');
-    Route::post('/{rentalID}/pay', [PaymentController::class, 'createRentalPayment'])->name('pay');
-    Route::get('/payment/return', [PaymentController::class, 'rentalPaymentReturn'])->name('payment.return');
-    Route::post('/payment/callback', [PaymentController::class, 'rentalPaymentCallback'])->name('payment.callback');
+    // --- ADMIN: Rental Route ---
+    Route::get('/admin/rentals/current', [RentalController::class, 'viewCurrentAdmin'])->name('admin.rentals.current')->middleware('role:administrator');
     
-    // ✅ Fixed history route
-    Route::get('/history', [RentalController::class, 'viewRentalHistory'])->name('history');
+    // --- ADMIN: Rating & Review Routes ---
+    Route::get('/admin/ratings', [RatingController::class, 'showCustomerRatings'])->name('admin.rating.view')->middleware('role:administrator');
+    
+    // --- ADMIN: Report Routes ---
+    Route::prefix('admin/reports')->name('admin.reports.')->middleware('role:administrator')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/create', [ReportController::class, 'create'])->name('create');
+        Route::get('/show', [ReportController::class, 'show'])->name('show');
+        Route::post('/publish', [ReportController::class, 'publish'])->name('publish');
+        Route::get('/published', [ReportController::class, 'publishedList'])->name('published');
+        Route::get('/forecast', [ReportController::class, 'getBookingForecast'])->name('forecast');
+    });
 
-    // ✅ Fixed request-approval route
-    Route::post('/{rentalID}/request-approval', [RentalController::class, 'requestApproval'])->name('requestApproval');
+    // --- ADMIN: Staff Management ---
+    Route::middleware('role:administrator')->group(function () {
+        Route::get('/staff/register', [RegisterController::class, 'showStaffRegistrationForm'])->name('staff.register');
+        Route::post('/register/staff', [RegisterController::class, 'registerStaff'])->name('staff.register.store');
+    });
+
+    // --- STAFF: Booking Routes ---
+    Route::prefix('staff/booking')->name('staff.booking.')->middleware('role:staff')->group(function () {
+        Route::get('/manage', [BookingController::class, 'showBookingPage'])->name('manage');
+        Route::get('/view-all', [BookingController::class, 'viewBookings'])->name('viewAll');
+        Route::get('/mini', [BookingController::class, 'showMiniFieldBooking'])->name('mini');
+        Route::get('/{slotID}/add', [BookingController::class, 'add'])->name('add');
+        Route::post('/store', [BookingController::class, 'store'])->name('store');
+        Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');
+        Route::put('/{bookingID}', [BookingController::class, 'update'])->name('update');
+        Route::delete('/{bookingID}/cancel', [BookingController::class, 'destroy'])->name('cancel');
+        Route::get('/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('slots.json');
+    });
+
+    // --- STAFF: Payment Routes ---
+    Route::prefix('staff/payment')->name('staff.payment.')->middleware('role:staff')->group(function () {
+        Route::post('/mark-completed/{bookingID}', [PaymentController::class, 'markAsCompleted'])->name('markCompleted');
+    });
+    
+    // --- STAFF: Rating & Review Routes ---
+    Route::get('/staff/ratings', [RatingController::class, 'showCustomerRatings'])->name('staff.rating.view')->middleware('role:staff');
+
+    // --- STAFF: Report Routes ---
+    Route::prefix('staff/reports')->name('staff.reports.')->middleware('role:staff')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/create', [ReportController::class, 'create'])->name('create');
+        Route::get('/show', [ReportController::class, 'show'])->name('show');
+        Route::post('/publish', [ReportController::class, 'publish'])->name('publish');
+        Route::get('/published', [ReportController::class, 'publishedList'])->name('published');
+        Route::get('/forecast', [ReportController::class, 'getBookingForecast'])->name('forecast');
+    });
+
+    // --- STAFF: Rental Routes ---
+    Route::prefix('staff/rental')->name('staff.rental.')->middleware('role:staff')->group(function () {
+        Route::get('/', [RentalController::class, 'index'])->name('main');
+        Route::get('/add', fn() => view('Rental.staff.addPage'))->name('add');
+        Route::post('/store', [RentalController::class, 'store'])->name('store');
+        Route::get('/edit/{itemID}', [RentalController::class, 'edit'])->name('edit');
+        Route::put('/update/{itemID}', [RentalController::class, 'update'])->name('update');
+        Route::delete('/delete/{itemID}', [RentalController::class, 'destroy'])->name('delete');
+    });
+    Route::middleware('role:staff')->group(function () {
+        Route::get('/staff/rentals/current', [RentalController::class, 'viewCurrent'])->name('staff.rentals.current');
+        Route::get('/staff/rentals/return-approval', [RentalController::class, 'viewReturnApprovals'])->name('staff.rentals.returnApproval');
+        Route::post('/staff/rentals/return-approval/{rentalID}', [RentalController::class, 'updateReturnApproval'])->name('staff.rentals.updateReturnApproval');
+    });
+
 });
-
-// Matchmaking
-
-// Personal Matchmaking Ads Page (list of user's ads)
-Route::get('/matchmaking/personal', [MatchController::class, 'personalAds'])
-     ->name('matchmaking.personal');
-
-// Other advertisements page (view other ads)
-Route::get('/matchmaking/other', [MatchController::class, 'otherAds'])
-     ->name('matchmaking.other');
-
-// Show the form to create new ad
-Route::get('/matchmaking/add', function () {
-    return view('Matchmaking.addOfferPage');
-})->name('matchmaking.add');
-
-// Store new advertisement (form submission)
-Route::post('/matchmaking/store', [MatchController::class, 'store'])
-     ->name('matchmaking.store');
-
-     // View a single advertisement
-Route::get('/matchmaking/view/{adsID}', [MatchController::class, 'view'])
-     ->name('matchmaking.view');
-
-// Edit an advertisement
-Route::get('/matchmaking/edit/{adsID}', [MatchController::class, 'edit'])
-     ->name('matchmaking.edit');
-
-// Update an advertisement
-Route::post('/matchmaking/update/{adsID}', [MatchController::class, 'update'])->name('matchmaking.update');
-
-// Delete an advertisement
-Route::delete('/matchmaking/destroy/{adsID}', [MatchController::class, 'destroy'])
-     ->name('matchmaking.destroy');
-
-// Show form to join an advertisement
-Route::get('/matchmaking/join/{adsID}', [MatchController::class, 'joinForm'])
-    ->name('matchmaking.joinForm');
-
-// Submit request
-Route::post('/matchmaking/join/{adsID}', [MatchController::class, 'joinStore'])
-    ->name('matchmaking.joinStore');
-
-Route::post('/applications/{id}/accept', [MatchController::class, 'accept'])
-    ->name('applications.accept');
-
-Route::post('/applications/{id}/reject', [MatchController::class, 'reject'])
-    ->name('applications.reject');
-
-// Customer Rating Routes
-Route::get('/customer/rating', [RatingController::class, 'showCustomerRatings'])
-    ->name('customer.rating.main');
-
-// Show Add Review Page
-Route::get('/customer/rating/add', [RatingController::class, 'showAddReviewForm'])
-    ->name('customer.rating.add');
-
-// Submit New Review
-Route::post('/customer/rating/add', [RatingController::class, 'addNewReview'])
-    ->name('customer.rating.store');
-
-Route::get('/customer/rating/edit/{ratingID}', [RatingController::class, 'showEditReviewForm'])->name('customer.rating.edit');
-Route::post('/customer/rating/update/{ratingID}', [RatingController::class, 'updateReview'])->name('customer.rating.update');
-
-Route::get('/customer/rating/delete/{ratingID}', [RatingController::class, 'deleteReview'])
-    ->name('customer.rating.delete');
-

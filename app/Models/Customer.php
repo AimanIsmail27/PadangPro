@@ -52,5 +52,12 @@ public function ratings()
     return $this->hasMany(Rating::class, 'userID', 'userID');
 }
 
+public function user()
+    {
+        // A Customer profile belongs to a User.
+        // The foreign key is 'userID' on the 'customer' table.
+        // The primary key is 'userID' on the 'user' table.
+        return $this->belongsTo(User::class, 'userID', 'userID');
+    }
 
 }

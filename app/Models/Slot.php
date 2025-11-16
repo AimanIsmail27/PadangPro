@@ -37,4 +37,6 @@ class Slot extends Model
     {
         return $this->belongsTo(Field::class, 'fieldID', 'fieldID');
     }
+
+    
 }

@@ -1,108 +1,100 @@
 @extends('layout.customer')
 
+@section('title', 'Confirm Your Rental')
+
 @section('content')
-<style>
-    .main {
-        padding: 30px;
-    }
-    .profile-section {
-        background: #1c2d6e;
-        border-radius: 8px;
-        height: 120px;
-        position: relative;
-    }
-    .profile-header {
-        color: white;
-        font-size: 20px;
-        font-weight: bold;
-        padding: 20px 30px;
-    }
-    .profile-card {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        padding: 30px;
-        width: 80%;
-        margin: 0 auto;
-        position: relative;
-        top: -40px;
-    }
-    .booking-details p {
-        margin: 5px 0;
-        font-size: 16px;
-    }
-    .btn-container {
-        margin-top: 20px;
-    }
-    .btn {
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 16px;
-        cursor: pointer;
-        border: none;
-        margin-right: 10px;
-    }
-    .btn-payment {
-        background: #28a745;
-        color: white;
-    }
-    .btn-edit {
-        background: #007bff;
-        color: white;
-    }
-    .btn-cancel {
-        background: #dc3545;
-        color: white;
-    }
-</style>
 
-<div class="main">
-    <!-- Blue header -->
-    <div class="profile-section">
-        <div class="profile-header">CONFIRM YOUR RENTAL</div>
-    </div>
-
-    <!-- White card -->
-    <div class="profile-card">
-        <div class="booking-details">
-            <h2 class="font-bold text-lg mb-4">Rental Summary</h2>
-                <p><strong>Name:</strong> {{ $rentalData->rental_Name }}</p>
-                <p><strong>Email:</strong> {{ $rentalData->rental_Email ?: '-' }}</p>
-                <p><strong>Phone Number:</strong> {{ $rentalData->rental_PhoneNumber }}</p>
-                <p><strong>Backup Number:</strong> {{ $rentalData->rental_BackupNumber ?: '-' }}</p>
-                <p><strong>Item:</strong> {{ $rentalData->item->item_Name }}</p>
-                <p><strong>Start Date:</strong> {{ \Carbon\Carbon::parse($rentalData->rental_StartDate)->format('d M Y') }}</p>
-                <p><strong>End Date:</strong> {{ \Carbon\Carbon::parse($rentalData->rental_EndDate)->format('d M Y') }}</p>
-                <p><strong>Number of Days:</strong> {{ $days }}</p>
-                <p><strong>Quantity:</strong> {{ $rentalData->quantity }}</p>
-                <p><strong>Price per Item:</strong> RM {{ number_format($rentalData->item->item_Price, 2) }}</p>
-                <p><strong>Total Price:</strong> RM {{ number_format($total, 2) }}</p>
-                <p><strong>Price to Pay (Deposit - 20%):</strong> RM {{ number_format($deposit, 2) }}</p>
-    </div>
-
-        <!-- Buttons -->
-        <div class="btn-container">
-            <form action="{{ route('customer.rental.pay', $rentalData->rentalID) }}" method="POST" style="display:inline;">
-                @csrf
-                <input type="hidden" name="total_amount" value="{{ $total }}">
-                <button type="submit" class="btn btn-payment">Continue to Payment</button>
-            </form>
-
-
-            <!-- Edit -->
-            <a href="{{ route('customer.rental.edit', $rentalData->rentalID) }}" class="btn btn-edit">Edit Rental</a>
-
-            <!-- Cancel (with SweetAlert) -->
-            <button type="button" class="btn btn-cancel" id="cancelRentalBtn">Cancel Rental</button>
-            <form id="cancelRentalForm" action="{{ route('customer.rental.destroy', $rentalData->rentalID) }}" method="POST" style="display:none;">
-                @csrf
-                @method('DELETE')
-            </form>
-        </div>
-    </div>
+<div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">Confirm Your Rental</h1>
+    <p class="mt-2 text-indigo-100">Please review your rental details before proceeding to payment.</p>
 </div>
 
-<!-- SweetAlert -->
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-8 md:p-10 w-11/12 mx-auto -mt-16 relative">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+        
+        <div class="space-y-4">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2">Your Information</h2>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Full Name</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $rentalData->rental_Name }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Email</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $rentalData->rental_Email ?: '-' }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Phone Number</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $rentalData->rental_PhoneNumber }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Backup Number</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $rentalData->rental_BackupNumber ?: '-' }}</p>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2">Rental Details</h2>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Item</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $rentalData->item->item_Name }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Rental Period</label>
+                <p class="text-lg font-semibold text-gray-900">
+                    {{ \Carbon\Carbon::parse($rentalData->rental_StartDate)->format('d M Y') }}
+                    to
+                    {{ \Carbon\Carbon::parse($rentalData->rental_EndDate)->format('d M Y') }}
+                    <span class="text-sm font-normal text-gray-500">({{ $days }} {{ \Illuminate\Support\Str::plural('day', $days) }})</span>
+                </p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Quantity</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $rentalData->quantity }}</p>
+            </div>
+            
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-2 mt-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-600">Total Price:</span>
+                    <span class="text-lg font-bold text-indigo-600">RM {{ number_format($total, 2) }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-600">Price to Pay (Deposit - 20%):</span>
+                    <span class="text-lg font-bold text-green-600">RM {{ number_format($deposit, 2) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 pt-6 border-t flex flex-wrap items-center gap-4">
+        <form action="{{ route('customer.rental.pay', $rentalData->rentalID) }}" method="POST" style="display:inline;">
+            @csrf
+            {{-- CRITICAL FIX: Changed 'total_amount' from $total to $deposit to match what the user is told they are paying --}}
+            <input type="hidden" name="total_amount" value="{{ $deposit }}">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all transform hover:scale-105">
+                <i class="bi bi-credit-card-fill mr-2"></i>
+                Continue to Payment
+            </button>
+        </form>
+
+        <a href="{{ route('customer.rental.edit', $rentalData->rentalID) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all">
+            <i class="bi bi-pencil-fill mr-2"></i>
+            Edit Rental
+        </a>
+
+        <button type="button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all" id="cancelRentalBtn">
+            <i class="bi bi-trash-fill mr-2"></i>
+            Cancel Rental
+        </button>
+        <form id="cancelRentalForm" action="{{ route('customer.rental.destroy', $rentalData->rentalID) }}" method="POST" style="display:none;">
+            @csrf
+            @method('DELETE')
+        </form>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.getElementById('cancelRentalBtn').addEventListener('click', function() {
@@ -111,24 +103,35 @@ document.getElementById('cancelRentalBtn').addEventListener('click', function() 
         text: "Your rental will be cancelled and this action cannot be undone.",
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, cancel it'
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, cancel it!',
+        cancelButtonText: 'No, keep it'
     }).then((result) => {
         if (result.isConfirmed) {
             document.getElementById('cancelRentalForm').submit();
         }
     });
 });
-
-// Success message if rental was deleted
-@if(session('success'))
-    Swal.fire({
-        icon: 'success',
-        title: 'Success',
-        text: "{{ session('success') }}",
-        confirmButtonColor: '#1c2d6e'
-    });
-@endif
 </script>
-@endsection
+
+<script>
+    @if(session('success'))
+        Swal.fire({
+            icon: 'success',
+            title: 'Success',
+            text: "{{ session('success') }}",
+            confirmButtonColor: '#4f46e5'
+        });
+    @endif
+    
+    @if(session('error'))
+        Swal.fire({
+            icon: 'error',
+            title: 'Action Failed',
+            text: "{{ session('error') }}",
+            confirmButtonColor: '#d33'
+        });
+    @endif
+</script>
+@endpush

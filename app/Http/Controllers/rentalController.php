@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\Staff;
 use App\Models\Rental; // Make sure Rental model exists
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class RentalController extends Controller
@@ -133,29 +134,50 @@ public function viewCurrent()
     // =========================
     // CUSTOMER FUNCTIONS
     // =========================
-    public function indexCustomer(Request $request)
-    {
-        $selectedDate = $request->query('rental_date') ?? date('Y-m-d');
+    // In app/Http/Controllers/RentalController.php
 
-        $items = Item::all();
-        $availableItems = [];
+public function indexCustomer(Request $request)
+{
+    // 1. Get the selected date, default to today
+    $selectedDate = $request->input('rental_date', Carbon::now('Asia/Kuala_Lumpur')->toDateString());
 
-        foreach ($items as $item) {
-            $bookedQuantity = Rental::where('itemID', $item->itemID)
-                ->whereIn('rental_Status', ['Pending', 'paid'])
-                ->whereDate('rental_StartDate', '<=', $selectedDate)
-                ->whereDate('rental_EndDate', '>=', $selectedDate)
-                ->sum('quantity');
+    // 2. GET ONLY ITEMS THAT ARE PERMANENTLY "Available"
+    //    This is the main fix.
+    $availableItems = Item::where('item_Status', 'Available')->get();
 
-            $item->available_quantity = $item->item_Quantity - $bookedQuantity;
+    // 3. Get all rented quantities for the selected date
+    $rentedQuantities = DB::table('rental')
+        ->where('rental_Status', 'paid') // Only count paid rentals
+        ->whereDate('rental_StartDate', '<=', $selectedDate)
+        ->whereDate('rental_EndDate', '>=', $selectedDate)
+        ->groupBy('itemID')
+        ->select('itemID', DB::raw('SUM(quantity) as rented_quantity'))
+        ->get()
+        ->keyBy('itemID'); // Makes it easy to look up by itemID
 
-            if ($item->available_quantity > 0) {
-                $availableItems[] = $item;
-            }
-        }
+    // 4. Calculate the *true* available quantity for each item
+    $itemsForView = $availableItems->map(function ($item) use ($rentedQuantities) {
+        $rented = $rentedQuantities->get($item->itemID);
+        $rentedCount = $rented ? $rented->rented_quantity : 0;
+        
+        // Calculate the quantity available *for that day*
+        $item->available_quantity = $item->item_Quantity - $rentedCount; 
+        
+        return $item;
+    })
+    ->filter(function ($item) {
+        // 5. Only show items that have at least 1 available for rent today
+        return $item->available_quantity > 0;
+    });
 
-        return view('Rental.customer.MainRentalPage', compact('availableItems', 'selectedDate'));
-    }
+    return view('Rental.customer.MainRentalPage', [
+        'availableItems' => $itemsForView,
+        'selectedDate' => $selectedDate,
+        // We add this for the SweetAlerts
+        'success' => session('success'),
+        'error' => session('error'),
+    ]);
+}
 
     // Show Rent Page for a specific item
     public function rentPage(Request $request, $itemID)
@@ -442,7 +464,19 @@ public function requestApproval($rentalId)
 }
 
 
+public function viewCurrentAdmin()
+{
+    $today = now()->toDateString();
 
+    $rentals = Rental::where('rental_Status', 'paid')
+        ->whereDate('rental_EndDate', '>=', $today)
+        ->orderBy('rental_StartDate', 'asc')
+        ->with('item')
+        ->get();
+
+    // This points to a new view in the admin folder
+    return view('Rental.admin.currentRentals', compact('rentals'));
+}
 
 
 

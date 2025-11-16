@@ -10,19 +10,31 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
 
+    <style>
+        /* 🌟 Custom combo gradient (darker diagonal + horizontal blend) */
+        .combo-gradient {
+            background-image: 
+                linear-gradient(to bottom right, #15803d, #064e3b),  /* darker diagonal base */
+                linear-gradient(to right, rgba(21, 128, 61, 0.4), rgba(6, 78, 59, 0.6)); /* horizontal overlay */
+            background-blend-mode: overlay;
+        }
+    </style>
 </head>
 <body class="h-screen flex">
+
     <!-- Left Section -->
-    <div class="w-1/2 bg-gradient-to-br from-green-800 to-green-900 text-white flex flex-col relative p-10">
+    <div class="w-1/2 combo-gradient text-white flex flex-col relative p-10">
         <!-- PadangPro title at top-left -->
-        <h1 class="text-3xl font-bold absolute text-[50px] top-10 left-30">PadangPro<span class="text-blue-400">.</span></h1>
+        <h1 class="text-3xl font-bold absolute text-[50px] top-10 left-30">
+            PadangPro<span class="text-blue-500">.</span>
+        </h1>
 
         <!-- Slogan centered vertically -->
- <div class="absolute bottom-10 left-10 font-bold italic text-[90px] left-30" style="font-family: 'Poppins', sans-serif;">
-        Reserve.<br>
-        Play.<br>
-        Repeat.
-    </div>
+        <div class="absolute bottom-10 left-10 font-bold italic text-[90px] left-30" style="font-family: 'Poppins', sans-serif;">
+            Reserve.<br>
+            Play.<br>
+            Repeat.
+        </div>
     </div>
 
     <!-- Right Section -->

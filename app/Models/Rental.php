@@ -47,4 +47,10 @@ class Rental extends Model
     {
         return $this->belongsTo(User::class, 'userID', 'userID');
     }
+
+    // Relation to Customer
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'userID', 'userID');
+    }
 }

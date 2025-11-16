@@ -1,105 +1,103 @@
 @extends('layout.customer')
 
+@section('title', 'Confirm Your Booking')
+
 @section('content')
-<style>
-    .main {
-        padding: 30px;
-    }
-    .profile-section {
-        background: #1c2d6e;
-        border-radius: 8px;
-        height: 120px;
-        position: relative;
-    }
-    .profile-header {
-        color: white;
-        font-size: 20px;
-        font-weight: bold;
-        padding: 20px 30px;
-    }
-    .profile-card {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        padding: 30px;
-        width: 80%;
-        margin: 0 auto;
-        position: relative;
-        top: -40px;
-    }
-    .booking-details p {
-        margin: 5px 0;
-        font-size: 16px;
-    }
-    .btn-container {
-        margin-top: 20px;
-    }
-    .btn {
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 16px;
-        cursor: pointer;
-        border: none;
-        margin-right: 10px;
-    }
-    .btn-payment {
-        background: #28a745;
-        color: white;
-    }
-    .btn-edit {
-        background: #007bff;
-        color: white;
-    }
-    .btn-cancel {
-        background: #dc3545;
-        color: white;
-    }
-</style>
 
-<div class="main">
-    <!-- Blue header -->
-    <div class="profile-section">
-        <div class="profile-header">CONFIRM YOUR BOOKING</div>
-    </div>
-
-    <!-- White card -->
-    <div class="profile-card">
-        <div class="booking-details">
-            <h2 class="font-bold text-lg mb-4">Booking Summary</h2>
-            <p><strong>Name:</strong> {{ $booking->booking_Name }}</p>
-            <p><strong>Email:</strong> {{ $booking->booking_Email }}</p>
-            <p><strong>Phone Number:</strong> {{ $booking->booking_PhoneNumber }}</p>
-            <p><strong>Backup Number:</strong> {{ $booking->booking_BackupNumber ?? '-' }}</p>
-            <p><strong>Field:</strong> {{ $booking->field->field_Label }}</p>
-            <p><strong>Date:</strong> {{ \Carbon\Carbon::parse($booking->slot->slot_Date)->format('d M Y') }}</p>
-            <p><strong>Time:</strong> {{ $booking->slot->slot_Time }}</p>
-            <p><strong>Price:</strong> RM {{ number_format($booking->slot->slot_Price, 2) }}</p>
-            <p><strong>Deposit Needed (20%):</strong> RM {{ number_format($booking->slot->slot_Price * 0.2, 2) }}</p>
-        </div>
-
-        <!-- Buttons -->
-        <div class="btn-container">
-            <!-- Payment -->
-            <a href="{{ route('payment.create', $booking->bookingID) }}" class="btn btn-payment">
-                Continue to Payment
-            </a>
-
-
-            <!-- Edit -->
-            <a href="{{ route('booking.edit', $booking->bookingID) }}" class="btn btn-edit">Edit Booking</a>
-
-            <!-- Cancel (with SweetAlert) -->
-            <button type="button" class="btn btn-cancel" id="cancelBookingBtn">Cancel Booking</button>
-            <form id="cancelBookingForm" action="{{ route('booking.cancel', $booking->bookingID) }}" method="POST" style="display:none;">
-                @csrf
-                @method('DELETE')
-            </form>
-        </div>
-    </div>
+<div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">Confirm Your Booking</h1>
+    <p class="mt-2 text-indigo-100">Please review your details before proceeding to payment.</p>
 </div>
 
-<!-- SweetAlert -->
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-8 md:p-10 w-11/12 mx-auto -mt-16 relative">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+        
+        <div class="space-y-4">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2">Your Information</h2>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Full Name</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $booking->booking_Name }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Email</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $booking->booking_Email }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Phone Number</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $booking->booking_PhoneNumber }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Backup Number</label>
+                <p class="text-lg font-semibold text-gray-900">{{ $booking->booking_BackupNumber ?? '-' }}</p>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2">Booking Details</h2>
+            <div>
+                {{-- =============================================== --}}
+                {{-- THIS BLOCK IS UPDATED --}}
+                {{-- =============================================== --}}
+                <label class="block text-sm font-medium text-gray-500">Field</label>
+                @php
+                    $fieldType = (str_contains($booking->field->field_Size, 'MINI SIZED')) 
+                        ? '(Mini Field)' 
+                        : '(Standard Field)';
+                @endphp
+                <p class="text-lg font-semibold text-gray-900">
+                    {{ $booking->field->field_Label }} {{ $fieldType }}
+                </p>
+                {{-- =============================================== --}}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Date</label>
+                <p class="text-lg font-semibold text-gray-900">{{ \Carbon\Carbon::parse($booking->slot->slot_Date)->format('d M Y') }}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500">Time</label>
+                <p class="text-lg font-semibold text-gray-900">{{ \Carbon\Carbon::parse($booking->slot->slot_Time)->format('h:i A') }}</p>
+            </div>
+            
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-2 mt-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-600">Total Price:</span>
+                    <span class="text-lg font-bold text-indigo-600">RM {{ number_format($booking->slot->slot_Price, 2) }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-600">Deposit (20%):</span>
+                    <span class="text-lg font-bold text-green-600">RM {{ number_format($booking->slot->slot_Price * 0.2, 2) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 pt-6 border-t flex flex-wrap items-center gap-4">
+        <a href="{{ route('payment.create', $booking->bookingID) }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all transform hover:scale-105">
+            <i class="bi bi-credit-card-fill mr-2"></i>
+            Continue to Payment
+        </a>
+
+        <a href="{{ route('booking.edit', $booking->bookingID) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all">
+            <i class="bi bi-pencil-fill mr-2"></i>
+            Edit Details
+        </a>
+
+        <button type="button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all" id="cancelBookingBtn">
+            <i class="bi bi-trash-fill mr-2"></i>
+            Cancel Booking
+        </button>
+        <form id="cancelBookingForm" action="{{ route('booking.cancel', $booking->bookingID) }}" method="POST" style="display:none;">
+            @csrf
+            @method('DELETE')
+        </form>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
 document.getElementById('cancelBookingBtn').addEventListener('click', function() {
     Swal.fire({
@@ -107,9 +105,10 @@ document.getElementById('cancelBookingBtn').addEventListener('click', function()
         text: "Your booking will be cancelled and this action cannot be undone.",
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, cancel it'
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, cancel it!',
+        cancelButtonText: 'No, keep it'
     }).then((result) => {
         if (result.isConfirmed) {
             document.getElementById('cancelBookingForm').submit();
@@ -117,15 +116,14 @@ document.getElementById('cancelBookingBtn').addEventListener('click', function()
     });
 });
 </script>
-<!-- SweetAlert for Payment Status -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     @if(session('success'))
         Swal.fire({
             icon: 'success',
             title: 'Success',
             text: "{{ session('success') }}",
-            confirmButtonColor: '#28a745'
+            confirmButtonColor: '#4f46e5' // Indigo-600
         });
     @endif
 
@@ -134,7 +132,7 @@ document.getElementById('cancelBookingBtn').addEventListener('click', function()
             icon: 'error',
             title: 'Payment Failed',
             text: "{{ session('error') }}",
-            confirmButtonColor: '#dc3545'
+            confirmButtonColor: '#d33'
         });
     @endif
 
@@ -143,9 +141,8 @@ document.getElementById('cancelBookingBtn').addEventListener('click', function()
             icon: 'warning',
             title: 'Pending',
             text: "{{ session('warning') }}",
-            confirmButtonColor: '#ffc107'
+            confirmButtonColor: '#f59e0b'
         });
     @endif
 </script>
-
-@endsection
+@endpush

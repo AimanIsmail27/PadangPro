@@ -9,6 +9,9 @@ use App\Models\Applications;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 
 class MatchController extends Controller
@@ -27,64 +30,66 @@ class MatchController extends Controller
         return view('Matchmaking.addOfferPage');
     }
 
-    /**
-     * Store a new matchmaking advertisement.
-     */
-    public function store(Request $request)
-    {
-        $userId = session('user_id'); // current logged-in user
 
-        if (!$userId) {
-            return redirect()->route('login')->with('error', 'Please log in to post an ad.');
-        }
-
-        // Get the customerID from userID
-        $customer = Customer::where('userID', $userId)->first();
-        if (!$customer) {
-            return redirect()->back()->with('error', 'Customer profile not found.');
-        }
-
-        // Validation rules
-        $rules = [
-            'ads_Name'        => 'required|string|max:255',
-            'ads_Type'        => 'required|string|in:Additional Player,Opponent Search',
-            'ads_Price'       => 'nullable|numeric|min:0',
-            'ads_Description' => 'required|string|max:1000',
-            'ads_SlotTime'    => 'required|date',
-        ];
-
-        if ($request->ads_Type === 'Additional Player') {
-            $rules['ads_RequiredPosition'] = 'required|array|min:1';
-            $rules['ads_RequiredPosition.*'] = 'string|max:10';
-            $rules['ads_MaxPlayers'] = 'required|integer|min:1';
-        }
-
-        $request->validate($rules);
-
-        // Generate unique adsID
-        $adsID = 'ADS' . strtoupper(uniqid());
-
-        $positions = $request->ads_Type === 'Additional Player' 
-                     ? json_encode($request->ads_RequiredPosition) 
-                     : null;
-
-        Advertisement::create([
-            'adsID'                => $adsID,
-            'ads_Name'             => $request->ads_Name,
-            'ads_Type'             => $request->ads_Type,
-            'ads_Price'            => $request->ads_Price ?? 0,
-            'ads_Description'      => $request->ads_Description,
-            'ads_Status'           => 'Active',
-            'ads_RequiredPosition' => $positions,
-            'ads_MaxPlayers'       => $request->ads_Type === 'Additional Player' ? $request->ads_MaxPlayers : null,
-            'ads_SlotTime'         => $request->ads_SlotTime,
-            'customerID'           => $customer->customerID,
-        ]);
-
-        return redirect()->route('matchmaking.personal')
-                         ->with('success', 'Your matchmaking advertisement has been posted successfully!');
+public function store(Request $request)
+{
+    $userId = session('user_id');
+    if (!$userId) {
+        return redirect()->route('login')->with('error', 'Please log in to post an ad.');
+    }
+    $customer = Customer::where('userID', $userId)->first();
+    if (!$customer) {
+        return redirect()->back()->with('error', 'Customer profile not found.');
     }
 
+    // --- UPDATED VALIDATION ---
+    $rules = [
+        'ads_Name'              => 'required|string|max:255',
+        'ads_Type'              => 'required|string|in:Additional Player,Opponent Search',
+        'ads_Price'             => 'nullable|numeric|min:0',
+        'ads_Description'       => 'required|string|max:65535',
+        'ads_SlotTime'          => 'required|date|after:now',
+        
+        // These rules are correct and will be applied
+        'ads_TargetSkillLevel'  => 'required|integer|min:1|max:5',
+        'ads_MatchIntensity'    => 'required|string|in:Fun,Competitive',
+    ];
+
+    if ($request->ads_Type === 'Additional Player') {
+        $rules['ads_RequiredPosition']   = 'required|array|min:1';
+        $rules['ads_RequiredPosition.*'] = 'string|max:10';
+        $rules['ads_MaxPlayers']         = 'required|integer|min:1';
+    }
+
+    // This line will stop the form if the AI fields are missing
+    $request->validate($rules);
+    // --- END UPDATED VALIDATION ---
+
+    $adsID = 'ADS' . strtoupper(uniqid());
+
+    $positions = $request->ads_Type === 'Additional Player' 
+                   ? json_encode($request->ads_RequiredPosition) 
+                   : null;
+
+    Advertisement::create([
+        'adsID'                 => $adsID,
+        'ads_Name'              => $request->ads_Name,
+        'ads_Type'              => $request->ads_Type,
+        'ads_Price'             => $request->ads_Price ?? 0,
+        'ads_Description'       => $request->ads_Description,
+        'ads_Status'            => 'Active',
+        'ads_RequiredPosition'  => $positions,
+        'ads_MaxPlayers'        => $request->ads_Type === 'Additional Player' ? $request->ads_MaxPlayers : null,
+        'ads_SlotTime'          => $request->ads_SlotTime,
+        'customerID'            => $customer->customerID,
+        'ads_TargetSkillLevel'  => $request->ads_TargetSkillLevel,
+        'ads_MatchIntensity'    => $request->ads_MatchIntensity,
+    ]);
+
+    return redirect()->route('matchmaking.personal')
+                     ->with('success', 'Your matchmaking advertisement has been posted successfully!');
+}
+   
     /**
      * Display all ads posted by the logged-in customer.
      */
@@ -164,59 +169,71 @@ class MatchController extends Controller
     /**
      * Update a specific advertisement.
      */
-    public function update(Request $request, $adsID)
-    {
-        $userId = session('user_id');
-        if (!$userId) {
-            return redirect()->route('login')->with('error', 'Please log in.');
-        }
+    // In app/Http/Controllers/MatchController.php
 
-        $customer = Customer::where('userID', $userId)->first();
-        if (!$customer) {
-            return redirect()->back()->with('error', 'Customer profile not found.');
-        }
-
-        $ad = Advertisement::where('adsID', $adsID)
-            ->where('customerID', $customer->customerID)
-            ->first();
-
-        if (!$ad) {
-            return redirect()->route('matchmaking.personal')->with('error', 'Ad not found or not owned by you.');
-        }
-
-        // ✅ Validation
-        $rules = [
-            'ads_Name'        => 'required|string|max:255',
-            'ads_Description' => 'required|string|max:1000',
-            'ads_Price'       => 'nullable|numeric|min:0',
-            'ads_SlotTime'    => 'required|date',
-        ];
-
-        if ($ad->ads_Type === 'Additional Player') {
-            $rules['ads_RequiredPosition'] = 'nullable|array';
-            $rules['ads_RequiredPosition.*'] = 'string|max:10';
-            $rules['ads_MaxPlayers'] = 'nullable|integer|min:1';
-        }
-
-        $validated = $request->validate($rules);
-
-        // ✅ Save data
-        $ad->ads_Name = $validated['ads_Name'];
-        $ad->ads_Description = $validated['ads_Description'];
-        $ad->ads_Price = $validated['ads_Price'] ?? 0;
-        $ad->ads_SlotTime = $validated['ads_SlotTime'];
-
-        if ($ad->ads_Type === 'Additional Player') {
-            $ad->ads_RequiredPosition = isset($validated['ads_RequiredPosition'])
-                ? json_encode($validated['ads_RequiredPosition'])
-                : json_encode([]);
-            $ad->ads_MaxPlayers = $validated['ads_MaxPlayers'] ?? null;
-        }
-
-        $ad->save();
-
-        return redirect()->route('matchmaking.personal')->with('success', 'Ad updated successfully.');
+public function update(Request $request, $adsID)
+{
+    $userId = session('user_id');
+    if (!$userId) {
+        return redirect()->route('login')->with('error', 'Please log in.');
     }
+
+    $customer = Customer::where('userID', $userId)->first();
+    if (!$customer) {
+        return redirect()->back()->with('error', 'Customer profile not found.');
+    }
+
+    $ad = Advertisement::where('adsID', $adsID)
+        ->where('customerID', $customer->customerID)
+        ->first();
+
+    if (!$ad) {
+        return redirect()->route('matchmaking.personal')->with('error', 'Ad not found or not owned by you.');
+    }
+
+    // --- UPDATED VALIDATION ---
+    $rules = [
+        'ads_Name'              => 'required|string|max:255',
+        'ads_Description'       => 'required|string|max:65535',
+        'ads_Price'             => 'nullable|numeric|min:0',
+        'ads_SlotTime'          => 'required|date|after:now',
+        
+        // Add validation for the new AI fields
+        'ads_TargetSkillLevel'  => 'required|integer|min:1|max:5',
+        'ads_MatchIntensity'    => 'required|string|in:Fun,Competitive',
+    ];
+
+    if ($ad->ads_Type === 'Additional Player') {
+        $rules['ads_RequiredPosition']   = 'required|array|min:1';
+        $rules['ads_RequiredPosition.*'] = 'string|max:10';
+        $rules['ads_MaxPlayers']         = 'required|integer|min:1';
+    }
+
+    $validated = $request->validate($rules);
+    // --- END UPDATED VALIDATION ---
+
+    // --- UPDATED SAVE LOGIC ---
+    $ad->ads_Name = $validated['ads_Name'];
+    $ad->ads_Description = $validated['ads_Description'];
+    $ad->ads_Price = $validated['ads_Price'] ?? 0;
+    $ad->ads_SlotTime = $validated['ads_SlotTime'];
+    
+    // Save the new AI fields
+    $ad->ads_TargetSkillLevel = $validated['ads_TargetSkillLevel'];
+    $ad->ads_MatchIntensity = $validated['ads_MatchIntensity'];
+
+    if ($ad->ads_Type === 'Additional Player') {
+        $ad->ads_RequiredPosition = isset($validated['ads_RequiredPosition'])
+                                    ? json_encode($validated['ads_RequiredPosition'])
+                                    : json_encode([]);
+        $ad->ads_MaxPlayers = $validated['ads_MaxPlayers'];
+    }
+
+    $ad->save();
+    // --- END UPDATED SAVE LOGIC ---
+
+    return redirect()->route('matchmaking.personal')->with('success', 'Ad updated successfully.');
+}
 
   
     public function view($adsID)
@@ -271,70 +288,120 @@ class MatchController extends Controller
                         ->with('success', 'Advertisement deleted successfully!');
     }
 
-   public function otherAds()
-{
-    $userId = session('user_id');
+   // In app/Http/Controllers/MatchController.php
 
-    if (!$userId) {
-        return redirect()->route('login')->with('error', 'Please log in.');
-    }
-
-    // Get current customer linked to this user
-    $customer = Customer::where('userID', $userId)->first();
-    if (!$customer) {
-        return redirect()->back()->with('error', 'Customer profile not found.');
-    }
-
-    $currentTime = \Carbon\Carbon::now('Asia/Kuala_Lumpur');
-
-    // Get ads not created by this customer and slot time in the future
-    $ads = Advertisement::where('customerID', '!=', $customer->customerID)
-        ->where('ads_SlotTime', '>', $currentTime)
-        ->orderBy('ads_SlotTime', 'asc')
-        ->get();
-
-    // Mark filled ads based on approved applications
-    foreach ($ads as $ad) {
-        $approvedCount = Applications::where('adsID', $ad->adsID)
-            ->where('status', 'Approved')
-            ->count();
-
-        $maxPlayers = $ad->ads_Type === 'Additional Player' ? $ad->ads_MaxPlayers : 1;
-
-        if ($approvedCount >= $maxPlayers) {
-            $ad->ads_Status = 'Filled';
+    public function otherAds(Request $request)
+    {
+        $userId = session('user_id');
+        if (!$userId) {
+            return redirect()->route('login')->with('error', 'Please log in.');
         }
-    }
 
-    // Fetch user’s applications (with ads relationship)
-    $applications = Applications::where('customerID', $customer->customerID)
-        ->whereHas('advertisement', function ($query) use ($currentTime) {
-            $query->where('ads_SlotTime', '>', $currentTime);
-        })
-        ->with('advertisement')
-        ->orderByDesc('created_at')
-        ->get();
+        $customer = Customer::where('userID', $userId)->first();
+        if (!$customer) {
+            return redirect()->back()->with('error', 'Customer profile not found.');
+        }
 
-    // Update ad status in each application
-    foreach ($applications as $application) {
-        $reqAd = $application->advertisement;
+        // Get the view state from the request, default to 'table'
+        $view = $request->input('view', 'table');
 
-        if ($reqAd) {
-            $approvedCount = Applications::where('adsID', $reqAd->adsID)
-                ->where('status', 'Approved')
-                ->count();
+        $currentTime = Carbon::now('Asia/Kuala_Lumpur');
+        $ads = new LengthAwarePaginator([], 0, 5); // Initialize an empty paginator
 
-            $maxPlayers = $reqAd->ads_Type === 'Additional Player' ? $reqAd->ads_MaxPlayers : 1;
+        try {
+            // 1. Call the Fuzzy Logic API
+            $response = Http::post('http://127.0.0.1:5001/match', [
+                'customerID' => $customer->customerID,
+                'customer_SkillLevel' => $customer->customer_SkillLevel,
+                'customer_AvailabilityDays' => $customer->customer_AvailabilityDays,
+                'customer_AvailabilityTimes' => $customer->customer_AvailabilityTimes,
+                // 'customer_Intensity' => $customer->customer_Intensity ?? 'Fun', // Add this later
+            ]);
 
+            if ($response->successful()) {
+                $scoredAds = $response->json();
+                
+                if (!is_array($scoredAds)) {
+                    Log::error('Fuzzy Match API returned invalid JSON.');
+                    $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view); // Pass $view
+                } else {
+                    $scoreMap = collect($scoredAds)->pluck('compatibility_score', 'adsID');
+                    $sortedAdIds = $scoreMap->keys();
+
+                    if ($sortedAdIds->isNotEmpty()) {
+                        // 3. Fetch ads from DB in the AI-sorted order
+                        $orderString = "FIELD(adsID, '" . implode("','", $sortedAdIds->all()) . "')";
+                        
+                        $ads = Advertisement::with('customer.user')
+                                    ->whereIn('adsID', $sortedAdIds)
+                                    ->orderByRaw($orderString)
+                                    ->paginate(5) // Gets 5 per page
+                                    ->appends(['view' => $view]); // <-- Adds ?view=table to links
+                                    
+                        // 4. Attach the AI score to each ad object
+                        foreach ($ads as $ad) {
+                            $ad->compatibility_score = $scoreMap[$ad->adsID] ?? 0;
+                        }
+                    }
+                    // If $sortedAdIds is empty, $ads remains an empty paginator
+                }
+            } else {
+                Log::error('Fuzzy Match API call failed: ' . $response->body());
+                $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view); // Pass $view
+            }
+
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('Fuzzy Match API connection failed: ' . $e->getMessage());
+            $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view); // Pass $view
+        }
+
+        // 4. Mark ads as 'Filled' (This now only runs on the 5 visible ads)
+        foreach ($ads as $ad) {
+            $approvedCount = Applications::where('adsID', $ad->adsID)->where('status', 'Approved')->count();
+            $maxPlayers = $ad->ads_Type === 'Additional Player' ? $ad->ads_MaxPlayers : 1;
             if ($approvedCount >= $maxPlayers) {
-                $reqAd->ads_Status = 'Filled';
+                $ad->ads_Status = 'Filled';
             }
         }
+
+        // 5. Fetch user's existing applications (This is unchanged)
+        $applications = Applications::where('customerID', $customer->customerID)
+            ->whereHas('advertisement', fn($q) => $q->where('ads_SlotTime', '>', $currentTime))
+            ->with('advertisement')
+            ->orderByDesc('created_at')
+            ->get();
+        
+        foreach ($applications as $application) {
+            if ($application->advertisement) {
+                $ad = $application->advertisement;
+                $approvedCount = Applications::where('adsID', $ad->adsID)->where('status', 'Approved')->count();
+                $maxPlayers = $ad->ads_Type === 'Additional Player' ? $ad->ads_MaxPlayers : 1;
+                if ($approvedCount >= $maxPlayers) {
+                    $ad->ads_Status = 'Filled';
+                }
+            }
+        }
+
+        return view('Matchmaking.otherOfferPage', compact('ads', 'applications', 'view'));
     }
 
-    return view('Matchmaking.otherOfferPage', compact('ads', 'applications'));
-}
-
+    /**
+    * A private helper function to act as a fallback in case the AI API fails.
+    */
+    private function getAdsTheOldWay($customerID, $currentTime, $view = 'table')
+    {
+        $ads = Advertisement::with('customer.user')
+            ->where('customerID', '!=', $customerID)
+            ->where('ads_SlotTime', '>', $currentTime)
+            ->orderBy('ads_SlotTime', 'asc')
+            ->paginate(5) // <-- Paginate the fallback
+            ->appends(['view' => $view]); // <-- Add view state to fallback links
+        
+        foreach ($ads as $ad) {
+            $ad->compatibility_score = 0;
+        }
+        return $ads;
+    }
 
 
 

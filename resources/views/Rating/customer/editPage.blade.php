@@ -3,38 +3,50 @@
 @section('title', 'Edit Your Review')
 
 @section('content')
-<!-- =================== PAGE HEADER =================== -->
-<div class="bg-[#1E2A78] rounded-lg h-[120px] relative shadow-md mb-8 flex items-center">
-    <div class="text-white font-bold text-3xl px-8">
-        Edit Your Review
-    </div>
+
+<div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">Edit Your Review</h1>
+    <p class="mt-2 text-indigo-100">Update your rating or review message.</p>
 </div>
 
-<!-- =================== MAIN FORM CARD =================== -->
-<div class="bg-white rounded-xl shadow-md p-8 max-w-3xl mx-auto">
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-8 md:p-10 w-11/12 mx-auto -mt-16 relative">
 
-    <h2 class="text-2xl font-semibold text-[#1E2A78] mb-4">Update Your Experience</h2>
+    @if ($errors->any())
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline">Please fix the following issues:</span>
+            <ul class="mt-3 list-disc list-inside text-sm">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <h2 class="text-2xl font-bold text-gray-800 mb-4">Update Your Experience</h2>
     <p class="text-gray-600 mb-6">
         You can adjust your previous rating or edit your review message here.
     </p>
 
     <form action="{{ route('customer.rating.update', $review->ratingID) }}" method="POST" class="space-y-8">
         @csrf
+        {{-- =============================================== --}}
+        {{-- THE @method('PUT') LINE HAS BEEN REMOVED --}}
+        {{-- =============================================== --}}
 
-        <!-- =================== RATING STARS =================== -->
         <div>
             <label class="block text-gray-700 font-medium mb-2">Your Rating</label>
             <div class="flex space-x-2">
                 @for ($i = 1; $i <= 5; $i++)
                     <label>
                         <input type="radio" name="rating_Score" value="{{ $i }}" 
-                            class="hidden peer"
-                            {{ $review->rating_Score == $i ? 'checked' : '' }} required>
+                               class="hidden peer"
+                               {{ (old('rating_Score', $review->rating_Score) == $i) ? 'checked' : '' }} required>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                              stroke-width="1.5" stroke="currentColor"
-                             class="w-9 h-9 text-gray-300 hover:text-yellow-400 cursor-pointer peer-checked:text-yellow-400 transition">
-                             <path stroke-linecap="round" stroke-linejoin="round"
-                                   d="M11.48 3.499a.562.562 0 011.04 0l2.062 4.178 4.616.671a.562.562 0 01.312.959l-3.34 3.256.788 4.597a.562.562 0 01-.815.592L12 15.347l-4.138 2.177a.562.562 0 01-.815-.592l.788-4.597-3.34-3.256a.562.562 0 01.312-.959l4.616-.671 2.062-4.178z" />
+                             class="w-10 h-10 text-gray-300 hover:text-yellow-400 cursor-pointer peer-checked:text-yellow-400 transition">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M11.48 3.499a.562.562 0 011.04 0l2.062 4.178 4.616.671a.562.562 0 01.312.959l-3.34 3.256.788 4.597a.562.562 0 01-.815.592L12 15.347l-4.138 2.177a.562.562 0 01-.815-.592l.788-4.597-3.34-3.256a.562.562 0 01.312-.959l4.616-.671 2.062-4.178z" />
                         </svg>
                     </label>
                 @endfor
@@ -42,26 +54,39 @@
             <p class="text-sm text-gray-500 mt-2">1 = Poor, 5 = Excellent</p>
         </div>
 
-        <!-- =================== REVIEW TEXT =================== -->
         <div>
             <label for="review_Given" class="block text-gray-700 font-medium mb-2">Your Review</label>
             <textarea name="review_Given" id="review_Given" rows="5" required
-                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-[#1E2A78] focus:border-[#1E2A78] p-3"
-                placeholder="Update your thoughts...">{{ old('review_Given', $review->review_Given) }}</textarea>
+                      class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-3"
+                      placeholder="Update your thoughts...">{{ old('review_Given', $review->review_Given) }}</textarea>
         </div>
 
-        <!-- =================== BUTTONS =================== -->
-        <div class="flex justify-end space-x-3">
+        <div class="flex justify-end space-x-3 pt-4 border-t">
             <a href="{{ route('customer.rating.main') }}"
-               class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition">
+               class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">
                Cancel
             </a>
-
             <button type="submit"
-                    class="px-4 py-2 bg-[#1E2A78] text-white rounded-md hover:bg-[#2638a0] transition">
+                    class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold shadow-md">
                 Update Review
             </button>
         </div>
     </form>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    {{-- This page only needs to show an error if the controller fails --}}
+    @if (session('error'))
+        Swal.fire({
+            title: "Action Not Allowed",
+            text: "{{ session('error') }}",
+            icon: "error",
+            confirmButtonColor: "#4f46e5",
+        });
+    @endif
+</script>
+@endpush

@@ -48,13 +48,14 @@ class Booking extends Model
     // Optional: Relationship to User
     public function user()
     {
-        return $this->belongsTo(\App\Models\User::class, 'userID', 'id'); // adjust key if needed
+        return $this->belongsTo(\App\Models\User::class, 'userID', 'userID'); // adjust key if needed
     }
 
     public function payment()
 {
     return $this->hasOne(Payment::class, 'bookingID', 'bookingID');
 }
+
 
 
 }

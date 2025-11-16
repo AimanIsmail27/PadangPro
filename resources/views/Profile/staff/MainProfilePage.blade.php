@@ -1,128 +1,99 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile - PadangPro (Staff)</title>
-    @vite('resources/css/app.css')
-    <style>
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f9f9f9;
-            margin: 0;
-            padding: 0;
-        }
-        aside {
-            width: 220px;
-            background: white;
-            color: #000;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
-        aside .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin-bottom: 40px;
-        }
-        aside nav ul {
-            list-style: none;
-            padding: 0;
-        }
-        aside nav ul li {
-            padding: 12px 0;
-            cursor: pointer;
-            font-weight: 500;
-        }
-        aside nav ul li a {
-            text-decoration: none;
-            color: #000;
-        }
-        aside nav ul li a:hover {
-            color: #007bff;
-        }
-        .main {
-            margin-left: 240px;
-            padding: 30px;
-        }
-        .topbar {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .profile-section {
-            background: #1c2d6e;
-            border-radius: 8px;
-            height: 120px;
-            position: relative;
-        }
-        .profile-header {
-            color: white;
-            font-size: 20px;
-            font-weight: bold;
-            padding: 20px 30px;
-        }
-        .profile-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            padding: 30px;
-            width: 80%;
-            margin: 0 auto;
-            position: relative;
-            top: -40px;
-        }
-        .profile-details {
-            text-align: left;
-        }
-        .profile-details p {
-            margin: 6px 0;
-        }
-    </style>
-</head>
-<body>
+@extends('layout.staff')
 
-    <!-- Sidebar -->
-    <aside>
-        <div class="logo">PadangPro</div>
-        <nav>
-            <ul>
-                <li><a href="{{ route('staff.dashboard') }}">Dashboard</a></li>
-                <li><a href="{{ route('staff.profile') }}">Profile</a></li>
-                <li>Booking</li>
-                <li>Rental</li>
-                <li>Matchmaking</li>
-                <li>Rating and Review</li>
-                <li>Logout</li>
-            </ul>
-        </nav>
-    </aside>
+@section('title', 'My Profile')
 
-    <div class="main">
-        <div class="topbar">
-            <div>Welcome! <strong>{{ $fullName }}</strong></div>
-        </div>
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+@endpush
 
-        <div class="profile-section">
-            <div class="profile-header">MY PROFILE</div>
-        </div>
+@section('content')
 
-        <div class="profile-card">
-            <div class="profile-details">
-                <p><strong>Your Name:</strong> {{ $fullName }}</p>
-                <p><strong>Email:</strong> {{ $email }}</p>
-                <p><strong>Phone Number:</strong> {{ $phoneNumber }}</p>
-                <p><strong>Your Age:</strong> {{ $age }}</p>
-                <p><strong>Your Address:</strong> {{ $address }}</p>
-                <p><strong>Your Job:</strong> {{ $job }}</p>
+<div class="bg-gradient-to-r from-lime-500 to-emerald-600 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">My Profile</h1>
+    <p class="mt-2 text-lime-100">Manage your personal information and account settings.</p>
+</div>
+
+{{-- Width constrained to 4/5 (or 80%) to match your admin page --}}
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-8 md:p-10 w-11/12 md:w-4/5 mx-auto -mt-16 relative">
+
+    {{-- Edit Profile Button --}}
+    <a href="{{ route('staff.profile.edit') }}" 
+       class="absolute top-6 right-6 bg-zinc-700 hover:bg-zinc-800 text-white font-semibold py-2 px-5 rounded-lg shadow-md transition-all transform hover:scale-105">
+        <i class="bi bi-pencil-fill mr-2"></i>Edit Profile
+    </a>
+
+    <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
+        
+        <div class="flex-shrink-0">
+            <div class="w-32 h-32 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center border-4 border-white shadow-md">
+                <i class="bi bi-person-fill text-7xl"></i>
             </div>
         </div>
-    </div>
 
-</body>
-</html>
+        <div class="flex-grow space-y-4 w-full">
+            <h2 class="text-3xl font-bold text-gray-800">{{ $fullName }}</h2>
+            <p class="text-lg font-medium text-lime-600 -mt-2">{{ $job }}</p>
+            
+            {{-- =============================================== --}}
+            {{-- NEW: Single column layout for details --}}
+            {{-- =============================================== --}}
+            <div class="pt-4 border-t">
+                <div class="space-y-3">
+                    <p class="text-gray-700 text-lg"><strong class="font-semibold w-32 inline-block">Staff ID:</strong> {{ $staffID }}</p>
+                    <p class="text-gray-700 text-lg"><strong class="font-semibold w-32 inline-block">Email:</strong> {{ $email }}</p>
+                    <p class="text-gray-700 text-lg"><strong class="font-semibold w-32 inline-block">Phone:</strong> {{ $phoneNumber }}</p>
+                    <p class="text-gray-700 text-lg"><strong class="font-semibold w-32 inline-block">Age:</strong> {{ $age }}</p>
+                    <p class="text-gray-700 text-lg"><strong class="font-semibold w-32 inline-block">Address:</strong> {{ $address }}</p>
+                </div>
+            </div>
+            {{-- =============================================== --}}
+        </div>
+    </div>
+    
+    <div class="mt-10 pt-6 border-t border-gray-200">
+        <form method="POST" action="{{ route('staff.profile.delete') }}" class="mt-8 text-left" id="deleteForm">
+            @csrf
+            @method('DELETE')
+            <input type="hidden" name="user_id" value="{{ session('user_id') }}">
+            <button type="button"
+                    class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-md font-semibold transition-all duration-200"
+                    id="deleteAccountBtn">Delete Your Account</button>
+        </form>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+{{-- SweetAlert2 for success message (e.g., from editing) --}}
+@if(session('success'))
+    <script>
+        Swal.fire({
+            title: 'Success!',
+            text: "{{ session('success') }}",
+            icon: 'success',
+            confirmButtonColor: '#166534', // green-800
+            confirmButtonText: 'OK'
+        });
+    </script>
+@endif
+
+{{-- SweetAlert2 for delete confirmation --}}
+<script>
+document.getElementById('deleteAccountBtn').addEventListener('click', function () {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "This action cannot be undone. Your account will be permanently deleted.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('deleteForm').submit();
+        }
+    });
+});
+</script>
+@endpush

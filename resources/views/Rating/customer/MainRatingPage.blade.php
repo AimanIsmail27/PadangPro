@@ -2,73 +2,68 @@
 
 @section('title', 'Rating & Review')
 
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+@endpush
+
 @section('content')
-<!-- Header Section -->
-<div class="bg-[#1E2A78] rounded-lg h-[120px] relative shadow-md mb-8 flex items-center">
-    <div class="text-white font-bold text-2xl px-8">
-        Rating & Review
-    </div>
+
+<div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+    <h1 class="text-3xl font-bold">Rating & Review</h1>
+    <p class="mt-2 text-indigo-100">See what other players are saying.</p>
 </div>
 
-<div class="container mx-auto px-6 py-6">
+<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-16 relative space-y-10">
 
-    <!-- ====== User's Own Review Section ====== -->
-    <div class="bg-white rounded-xl shadow-md p-6 border hover:shadow-lg transition mb-10">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-[#1E2A78]">Your Submitted Review</h2>
-            <div class="space-x-3">
+    <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+            <h2 class="text-2xl font-bold text-gray-800">Your Submitted Review</h2>
+            <div class="flex-shrink-0 space-x-3">
                 @if(empty($yourSubmittedReview))
-                    <!-- Show Add New Review button only if user has not submitted -->
                     <a href="{{ route('customer.rating.add') }}" 
-                    class="bg-[#1E2A78] text-white px-4 py-2 rounded-md hover:bg-[#2638a0] transition">
-                    Add New Review
+                       class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2 rounded-lg shadow-md transition-all transform hover:scale-105">
+                        <i class="bi bi-plus-circle-fill mr-1"></i> Add New Review
                     </a>
                 @else
-                    <!-- Otherwise, show Edit button -->
                     <a href="{{ route('customer.rating.edit', $yourSubmittedReview['ratingID']) }}" 
-                    class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition">
-                    Edit Review
+                       class="bg-yellow-500 text-white font-semibold px-5 py-2 rounded-lg shadow-md hover:bg-yellow-600 transition-all">
+                        <i class="bi bi-pencil-fill mr-1"></i> Edit Review
                     </a>
-
-                     <!-- Delete Review Button (SweetAlert2 confirmation) -->
                     <a href="javascript:void(0);" 
-                    onclick="confirmDelete('{{ route('customer.rating.delete', $yourSubmittedReview['ratingID']) }}')" 
-                    class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition">
-                    Delete Review
+                       onclick="confirmDelete('{{ route('customer.rating.delete', $yourSubmittedReview['ratingID']) }}')" 
+                       class="bg-red-600 text-white font-semibold px-5 py-2 rounded-lg shadow-md hover:bg-red-700 transition-all">
+                       <i class="bi bi-trash-fill mr-1"></i> Delete Review
                     </a>
                 @endif
             </div>
-
         </div>
 
-
-        @if(!empty($yourSubmittedReview))
-        <div class="border-t pt-4">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="font-semibold text-lg text-[#1E2A78]">Your Latest Review</h3>
-                <span class="text-yellow-500 font-bold">
-                    {{ str_repeat('★', $yourSubmittedReview['rating_Score']) }}
-                    {{ str_repeat('☆', 5 - $yourSubmittedReview['rating_Score']) }}
-                </span>
-            </div>
-            <p class="text-gray-700 mb-3 text-sm">“{{ $yourSubmittedReview['review_Given'] }}”</p>
-            <p class="text-sm text-gray-500">
-                Submitted on: {{ \Carbon\Carbon::parse($yourSubmittedReview['review_Date'])->format('d M Y') }}
-            </p>
+        <div class="border-t pt-6">
+            @if(!empty($yourSubmittedReview))
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold text-lg text-indigo-700">Your Latest Review</h3>
+                    <span class="text-yellow-500 font-bold text-lg">
+                        {{ str_repeat('★', $yourSubmittedReview['rating_Score']) }}
+                        {{ str_repeat('☆', 5 - $yourSubmittedReview['rating_Score']) }}
+                    </span>
+                </div>
+                <p class="text-gray-700 mb-3 text-lg italic">“{{ $yourSubmittedReview['review_Given'] }}”</p>
+                <p class="text-sm text-gray-500">
+                    Submitted on: {{ \Carbon\Carbon::parse($yourSubmittedReview['review_Date'])->format('d M Y') }}
+                </p>
+            @else
+                <p class="text-gray-500 italic">You haven't submitted any review yet.</p>
+            @endif
         </div>
-        @else
-        <p class="text-gray-500 italic">You haven't submitted any review yet.</p>
-        @endif
     </div>
 
-    <!-- ====== All Ratings & Reviews ====== -->
-    <div class="bg-gray-50 p-6 rounded-lg shadow-inner border-2 border-[#1E2A78]/60">
-        <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
-            <h2 class="text-xl font-semibold text-gray-800">All Ratings & Reviews</h2>
+    <div class="bg-slate-50 p-6 rounded-lg shadow-inner border border-slate-200">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">All Ratings & Reviews</h2>
             <div class="flex items-center space-x-3">
                 <label for="filter" class="text-gray-700 font-medium">Sort By:</label>
                 <select id="filter"
-                        class="border-gray-300 rounded-md p-2 shadow-sm focus:ring-[#1E2A78] focus:border-[#1E2A78]"
+                        class="border-gray-300 rounded-md p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                         onchange="window.location='{{ route('customer.rating.main') }}?filter=' + this.value">
                     <option value="latest" {{ $currentSort == 'latest' ? 'selected' : '' }}>Latest</option>
                     <option value="oldest" {{ $currentSort == 'oldest' ? 'selected' : '' }}>Oldest</option>
@@ -78,18 +73,17 @@
             </div>
         </div>
 
-        <!-- Ratings List -->
         <div class="space-y-5">
             @foreach ($allRatings as $rating)
                 <div class="bg-white p-5 rounded-lg shadow-md border hover:shadow-lg transition">
                     <div class="flex items-center justify-between mb-2">
-                        <h3 class="font-semibold text-lg text-[#1E2A78]">{{ $rating->customer->customer_FullName ?? 'Anonymous User' }}</h3>
-                        <span class="text-yellow-500 font-bold">
+                        <h3 class="font-semibold text-lg text-gray-800">{{ $rating->customer->customer_FullName ?? 'Anonymous User' }}</h3>
+                        <span class="text-yellow-500 font-bold text-lg">
                             {{ str_repeat('★', $rating['rating_Score']) }}
                             {{ str_repeat('☆', 5 - $rating['rating_Score']) }}
                         </span>
                     </div>
-                    <p class="text-gray-700 mb-3 text-sm">“{{ $rating['review_Given'] }}”</p>
+                    <p class="text-gray-700 mb-3 italic">“{{ $rating['review_Given'] }}”</p>
                     <p class="text-sm text-gray-500">
                         Submitted on: {{ \Carbon\Carbon::parse($rating['review_Date'])->format('d M Y') }}
                     </p>
@@ -97,51 +91,25 @@
             @endforeach
         </div>
 
-        <!-- Pagination -->
         @if ($allRatings->hasPages())
-            <div class="mt-10 text-center">
-                <p class="text-gray-600 mb-4">
-                    Showing {{ $allRatings->firstItem() }} to {{ $allRatings->lastItem() }} of {{ $allRatings->total() }} results
-                </p>
-                <div class="flex justify-center space-x-2">
-                    {{-- Previous Page --}}
-                    @if ($allRatings->onFirstPage())
-                        <span class="px-3 py-1 bg-gray-200 text-gray-500 rounded cursor-not-allowed">&lt;</span>
-                    @else
-                        <a href="{{ $allRatings->appends(['filter' => $currentSort])->previousPageUrl() }}" class="px-3 py-1 bg-[#1E2A78] text-white rounded hover:bg-[#2638a0]">&lt;</a>
-                    @endif
-
-                    {{-- Page Numbers --}}
-                    @foreach ($allRatings->getUrlRange(1, $allRatings->lastPage()) as $page => $url)
-                        @if ($page == $allRatings->currentPage())
-                            <span class="px-3 py-1 bg-yellow-500 text-white rounded">{{ $page }}</span>
-                        @else
-                            <a href="{{ $url }}&filter={{ $currentSort }}" class="px-3 py-1 bg-white border text-[#1E2A78] rounded hover:bg-gray-100">{{ $page }}</a>
-                        @endif
-                    @endforeach
-
-                    {{-- Next Page --}}
-                    @if ($allRatings->hasMorePages())
-                        <a href="{{ $allRatings->appends(['filter' => $currentSort])->nextPageUrl() }}" class="px-3 py-1 bg-[#1E2A78] text-white rounded hover:bg-[#2638a0]">&gt;</a>
-                    @else
-                        <span class="px-3 py-1 bg-gray-200 text-gray-500 rounded cursor-not-allowed">&gt;</span>
-                    @endif
-                </div>
+            <div class="mt-10">
+                {{-- This uses the built-in, styled Tailwind paginator --}}
+                {{ $allRatings->appends(['filter' => $currentSort])->links() }}
             </div>
         @endif
     </div>
 </div>
+@endsection
 
-<!-- =================== SWEETALERT2 =================== -->
+@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
 @if (session('success'))
     Swal.fire({
         title: "Success!",
         text: "{{ session('success') }}",
         icon: "success",
-        confirmButtonColor: "#1E2A78",
+        confirmButtonColor: "#4f46e5", // Indigo-600
     });
 @endif
 
@@ -150,7 +118,7 @@
         title: "Action Not Allowed",
         text: "{{ session('error') }}",
         icon: "error",
-        confirmButtonColor: "#1E2A78",
+        confirmButtonColor: "#4f46e5",
     });
 @endif
 
@@ -165,14 +133,9 @@ function confirmDelete(url) {
         confirmButtonText: "Yes, delete it!"
     }).then((result) => {
         if (result.isConfirmed) {
-            // Redirect to the delete route
             window.location.href = url;
         }
     });
 }
 </script>
-@endsection
-
-
-
-
+@endpush
