@@ -2,6 +2,10 @@
 
 @section('title', 'Create Matchmaking Advertisement')
 
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+@endpush
+
 @section('content')
     <div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white rounded-lg h-[120px] relative shadow-md mb-8 flex items-center">
         <div class="text-white font-bold text-2xl px-8">
@@ -18,13 +22,10 @@
         </div>
     @endif
 
-    {{-- =============================================== --}}
-    {{-- NEW: THIS BLOCK WILL DISPLAY VALIDATION ERRORS --}}
-    {{-- =============================================== --}}
+    {{-- Validation Errors --}}
     @if ($errors->any())
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
             <strong class="font-bold">Error!</strong>
-            <span class="block sm:inline">Please fix the following issues:</span>
             <ul class="mt-3 list-disc list-inside text-sm">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -32,7 +33,7 @@
             </ul>
         </div>
     @endif
-    {{-- =============================================== --}}
+    {{-- END Validation Errors --}}
 
     <form action="{{ route('matchmaking.store') }}" method="POST" class="space-y-6">
         @csrf
@@ -123,9 +124,18 @@
                       placeholder="Provide details about your ad...">{{ old('ads_Description') }}</textarea>
         </div>
 
-        <div class="flex justify-end pt-4 border-t">
+        {{-- Responsive Button Group --}}
+        <div class="flex flex-col-reverse md:flex-row justify-end gap-3 pt-4 border-t">
+            
+            {{-- Cancel Button (Appears above Submit on mobile) --}}
+            <a href="{{ route('matchmaking.personal') }}"
+               class="w-full md:w-auto text-center px-8 py-3 rounded-xl shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition font-semibold text-lg">
+                Cancel
+            </a>
+
+            {{-- Submit Button (Primary Action) --}}
             <button type="submit"
-                    class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white px-8 py-3 rounded-xl shadow-lg hover:opacity-90 transition font-semibold text-lg">
+                    class="w-full md:w-auto bg-gradient-to-r from-indigo-600 to-slate-800 text-white px-8 py-3 rounded-xl shadow-lg hover:opacity-90 transition font-semibold text-lg">
                 Post Advertisement
             </button>
         </div>
@@ -142,7 +152,6 @@
     // Get the inputs that we need to make required/not required
     const targetSkillInput = document.getElementById('ads_TargetSkillLevel');
     const maxPlayersInput = document.getElementById('ads_MaxPlayers');
-    // Find the radio buttons
     const intensityRadios = document.querySelectorAll('input[name="ads_MatchIntensity"]');
     
     function toggleFields() {
@@ -164,7 +173,7 @@
             // Set fields for "Additional Player" as required
             targetSkillInput.required = true;
             maxPlayersInput.required = true;
-            intensityRadios[0].required = true; // Make at least one radio button required
+            intensityRadios[0].required = true; 
             
         } else if (selectedType === 'Opponent Search') {
             aiMatchingFields.style.display = 'block';
@@ -176,22 +185,21 @@
     }
 
     adsTypeSelect.addEventListener('change', toggleFields);
+    // Initial run to show fields if old data exists
     toggleFields();
 </script>
 
 @if(session('success'))
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    Swal.fire({
-        title: 'Success!',
-        text: "{{ session('success') }}",
-        icon: 'success',
-        confirmButtonColor: '#312e81',
-        confirmButtonText: 'OK'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = "{{ route('matchmaking.personal') }}";
-        }
+    document.addEventListener('DOMContentLoaded', function() {
+        Swal.fire({
+            title: 'Success!',
+            text: "{{ session('success') }}",
+            icon: 'success',
+            confirmButtonColor: '#4f46e5', // Indigo-600
+            confirmButtonText: 'OK'
+        });
     });
 </script>
 @endif

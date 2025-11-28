@@ -78,12 +78,36 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-4 pt-4 border-t">
-            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition transform hover:scale-105">
-                Generate Report
-            </button>
-            <a href="{{ route('admin.reports.index') }}" class="text-gray-600 hover:text-gray-900">Cancel</a>
+        {{-- BUTTONS RESPONSIVE AREA --}}
+        <div class="pt-4 border-t">
+            
+            {{-- Desktop & Tablet: buttons inline --}}
+            <div class="hidden md:flex items-center gap-4">
+                <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition transform hover:scale-105">
+                    Generate Report
+                </button>
+
+                <a href="{{ route('admin.reports.index') }}" 
+                   class="text-gray-600 hover:text-gray-900">
+                    Cancel
+                </a>
+            </div>
+
+            {{-- Mobile Layout: stacked full width --}}
+            <div class="flex flex-col md:hidden gap-3 mt-2">
+                <button type="submit" 
+                        class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-md transition">
+                    Generate Report
+                </button>
+
+                <a href="{{ route('admin.reports.index') }}" 
+                   class="text-center text-gray-600 hover:text-gray-900 underline">
+                    Cancel
+                </a>
+            </div>
+
         </div>
+
     </form>
 </div>
 @endsection
@@ -93,61 +117,53 @@
     document.addEventListener('DOMContentLoaded', function () {
         const reportTypeSelect = document.getElementById('report_type');
         
-        // Main containers
         const dateRangeContainer = document.getElementById('date-range-container');
         const groupByContainer = document.getElementById('group-by-container');
         const filtersContainer = document.getElementById('filters-container');
 
-        // Specific filter containers
         const fieldFilterContainer = document.getElementById('field-filter-container');
         const itemFilterContainer = document.getElementById('item-filter-container');
 
-        // Input fields
         const startDateInput = document.getElementById('start_date');
         const endDateInput = document.getElementById('end_date');
 
         function updateFormVisibility() {
             const selectedType = reportTypeSelect.value;
 
-            // --- Reset: Hide everything first ---
             dateRangeContainer.style.display = 'none';
             groupByContainer.style.display = 'none';
             filtersContainer.style.display = 'none';
             fieldFilterContainer.style.display = 'none';
             itemFilterContainer.style.display = 'none';
 
-            // --- Enable/disable based on selection ---
-            if (!selectedType) return; // Do nothing if no report is selected
+            if (!selectedType) return;
 
-            // All our reports require a date range
             dateRangeContainer.style.display = 'block';
             startDateInput.required = true;
             endDateInput.required = true;
 
-            // Reports that are trends over time need "Group By"
             if (['booking_revenue', 'booking_count', 'rental_revenue'].includes(selectedType)) {
                 groupByContainer.style.display = 'block';
             }
 
-            // Show filters container if any filter is applicable
-            if (selectedType.startsWith('booking') || selectedType === 'field_performance' || selectedType === 'peak_hours' || selectedType.startsWith('rental') || selectedType === 'item_popularity') {
+            if (selectedType.startsWith('booking') || 
+                selectedType === 'field_performance' || 
+                selectedType === 'peak_hours' || 
+                selectedType.startsWith('rental') || 
+                selectedType === 'item_popularity') {
                 filtersContainer.style.display = 'block';
             }
 
-            // Show specific filters for booking reports
             if (selectedType.startsWith('booking') || selectedType === 'field_performance' || selectedType === 'peak_hours') {
                 fieldFilterContainer.style.display = 'block';
             }
 
-            // Show specific filters for rental reports
             if (selectedType.startsWith('rental') || selectedType === 'item_popularity') {
                 itemFilterContainer.style.display = 'block';
             }
         }
 
         reportTypeSelect.addEventListener('change', updateFormVisibility);
-
-        // Run on page load to set the initial correct state
         updateFormVisibility();
     });
 </script>

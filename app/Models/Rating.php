@@ -28,12 +28,25 @@ class Rating extends Model
         'review_Given',
         'review_Date',
         'review_Time',
-        'userID'
+        'userID',
+        'bookingID', // <-- Added
+        'rentalID',
     ];
 
     public function customer()
-{
-    return $this->belongsTo(Customer::class, 'userID', 'userID');
-}
+    {
+        return $this->belongsTo(Customer::class, 'userID', 'userID');
+    }
+    
+    public function booking()
+    {
+        return $this->belongsTo(Booking::class, 'bookingID', 'bookingID');
+    }
+
+    // Link to Rental
+    public function rental()
+    {
+        return $this->belongsTo(Rental::class, 'rentalID', 'rentalID');
+    }
 
 }

@@ -192,4 +192,16 @@
         }
     });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+@if(session('success'))
+<script>
+Swal.fire({
+    title: "Welcome!",
+    text: "{{ session('success') }}",
+    icon: "success",
+    confirmButtonColor: "#4f46e5"
+});
+</script>
+@endif
+
 @endpush

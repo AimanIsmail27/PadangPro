@@ -15,6 +15,7 @@
 
 <div class="bg-white rounded-xl shadow-xl border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-16 relative space-y-12">
 
+    {{-- Filter Form --}}
     <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
         <form action="{{ route('staff.booking.viewAll') }}" method="GET" class="flex flex-wrap items-center gap-4">
             
@@ -48,140 +49,224 @@
         </form>
     </div>
 
+    {{-- STAFF & ADMIN BOOKINGS --}}
     <div>
         <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Staff & Admin Reservations (Internal)</h2>
-        @if($adminBookings->isEmpty())
-            <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
-                <i class="bi bi-calendar-x text-4xl text-gray-400"></i>
-                <p class="mt-4 text-gray-500">No staff/admin reservations found for the selected filters.</p>
-            </div>
-        @else
-            <div class="overflow-x-auto shadow-md rounded-xl border border-gray-100">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-zinc-800">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Title / Customer Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Reserved By</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Field</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Date & Time</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-center text-xs font-semibold text-lime-300 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        @foreach($adminBookings as $booking)
-                            <tr class="hover:bg-slate-50/50 transition-colors {{ $booking->isExpired ? 'opacity-60' : '' }}">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $booking->booking_Name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->user->full_name ?? 'Unknown Staff/Admin' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->field->field_Label ?? 'N/A' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->formattedDate }}, {{ $booking->formattedTime }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($booking->isExpired)
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800"><i class="bi bi-clock-history mr-1.5"></i> Expired</span>
-                                    @else
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800"><i class="bi bi-journal-check mr-1.5"></i> Reserved</span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-4">
-                                    @if(!$booking->isExpired)
-                                        <a href="{{ route('staff.booking.edit', $booking->bookingID) }}" class="text-lime-600 hover:text-lime-900">Edit</a>
-                                        <form action="{{ route('staff.booking.cancel', $booking->bookingID) }}" method="POST" class="inline-block">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="button" class="text-red-600 hover:text-red-900 cancel-booking-btn">Cancel</button>
-                                        </form>
-                                    @else
-                                        <span>—</span>
-                                    @endif
-                                </td>
+
+        {{-- Desktop Table --}}
+        <div class="hidden md:block">
+            @if($adminBookings->isEmpty())
+                <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
+                    <i class="bi bi-calendar-x text-4xl text-gray-400"></i>
+                    <p class="mt-4 text-gray-500">No staff/admin reservations found for the selected filters.</p>
+                </div>
+            @else
+                <div class="overflow-x-auto shadow-md rounded-xl border border-gray-100">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-zinc-800">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Title / Customer Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Reserved By</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Field</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Date & Time</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-lime-300 uppercase tracking-wider">Actions</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            <div class="mt-4">
-                {{ $adminBookings->appends(request()->query())->links() }}
-            </div>
-        @endif
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach($adminBookings as $booking)
+                                <tr class="hover:bg-slate-50/50 transition-colors {{ $booking->isExpired ? 'opacity-60' : '' }}">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $booking->booking_Name }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->user->full_name ?? 'Unknown Staff/Admin' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->field->field_Label ?? 'N/A' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->formattedDate }}, {{ $booking->formattedTime }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        @if($booking->isExpired)
+                                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800"><i class="bi bi-clock-history mr-1.5"></i> Expired</span>
+                                        @else
+                                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800"><i class="bi bi-journal-check mr-1.5"></i> Reserved</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-4">
+                                        @if(!$booking->isExpired)
+                                            <a href="{{ route('staff.booking.edit', $booking->bookingID) }}" class="text-lime-600 hover:text-lime-900">Edit</a>
+                                            <form action="{{ route('staff.booking.cancel', $booking->bookingID) }}" method="POST" class="inline-block">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="button" class="text-red-600 hover:text-red-900 cancel-booking-btn">Cancel</button>
+                                            </form>
+                                        @else
+                                            <span>—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4">
+                    {{ $adminBookings->appends(request()->query())->links() }}
+                </div>
+            @endif
+        </div>
+
+        {{-- Mobile Card View --}}
+        <div class="md:hidden space-y-4">
+            @forelse($adminBookings as $booking)
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm {{ $booking->isExpired ? 'opacity-60' : '' }}">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="font-bold text-gray-900">{{ $booking->booking_Name }}</div>
+                        <div class="text-sm text-gray-500">{{ $booking->formattedDate }}</div>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-1"><strong>Reserved By:</strong> {{ $booking->user->full_name ?? 'Unknown Staff/Admin' }}</div>
+                    <div class="text-sm text-gray-500 mb-1"><strong>Field:</strong> {{ $booking->field->field_Label ?? 'N/A' }}</div>
+                    <div class="text-sm text-gray-500 mb-1"><strong>Time:</strong> {{ $booking->formattedTime }}</div>
+                    <div class="mb-2">
+                        @if($booking->isExpired)
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800"><i class="bi bi-clock-history mr-1.5"></i> Expired</span>
+                        @else
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"><i class="bi bi-journal-check mr-1.5"></i> Reserved</span>
+                        @endif
+                    </div>
+                    @if(!$booking->isExpired)
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('staff.booking.edit', $booking->bookingID) }}" class="text-lime-600 hover:text-lime-900 text-sm font-medium">Edit</a>
+                            <form action="{{ route('staff.booking.cancel', $booking->bookingID) }}" method="POST" class="inline-block">
+                                @csrf
+                                @method('DELETE')
+                                <button type="button" class="text-red-600 hover:text-red-900 cancel-booking-btn text-sm font-medium">Cancel</button>
+                            </form>
+                        </div>
+                    @endif
+                </div>
+            @empty
+                <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
+                    <i class="bi bi-calendar-x text-4xl text-gray-400"></i>
+                    <p class="mt-4 text-gray-500">No staff/admin reservations found for the selected filters.</p>
+                </div>
+            @endforelse
+        </div>
     </div>
 
+    {{-- CUSTOMER BOOKINGS --}}
     <div>
         <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Registered Customer Bookings</h2>
-        @if($customerBookings->isEmpty())
-            <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
-                <i class="bi bi-person-x text-4xl text-gray-400"></i>
-                <p class="mt-4 text-gray-500">No customer bookings found for the selected filters.</p>
-            </div>
-        @else
-            <div class="overflow-x-auto shadow-md rounded-xl border border-gray-100">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-zinc-800">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Booked By</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Field</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Date & Time</th>
-                            <th class="px-6 py-3 text-center text-xs font-semibold text-lime-300 uppercase tracking-wider">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        @foreach($customerBookings as $booking)
-                            <tr class="hover:bg-slate-50/50 transition-colors">
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">{{ $booking->user->full_name ?? 'N/A' }}</div>
-                                    <div class="text-sm text-gray-500">{{ $booking->user->user_Email ?? 'N/A' }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->field->field_Label ?? 'N/A' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->formattedDate }}, {{ $booking->formattedTime }}</td>
-                                
-                                {{-- =============================================== --}}
-                                {{-- NEW: STATUS COLUMN WITH CASH BUTTON (FIXED ROUTE) --}}
-                                {{-- =============================================== --}}
-                                <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    @if($booking->display_Status === 'Awaiting Balance')
-                                        <form action="{{ route('staff.payment.markCompleted', $booking->bookingID) }}" method="POST" class="inline-block">
-                                            @csrf
-                                            <button type="button" class="inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition shadow-md record-cash-btn">
-                                                <i class="bi bi-cash-coin mr-1.5"></i> Record Cash
-                                            </button>
-                                        </form>
-                                    
-                                    @elseif($booking->display_Status === 'Paid (Deposit)')
-                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                                            <i class="bi bi-calendar-check mr-1.5"></i> Paid (Deposit)
-                                        </span>
-                                        
-                                    @elseif($booking->display_Status === 'Completed')
-                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                                            <i class="bi bi-check-circle-fill mr-1.5"></i> Completed
-                                        </span>
-                                        
-                                    @elseif($booking->display_Status === 'Expired')
-                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                                            <i class="bi bi-clock-history mr-1.5"></i> Expired
-                                        </span>
-                                        
-                                    @else
-                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                                            {{ $booking->display_Status }}
-                                        </span>
-                                    @endif
-                                </td>
-                                {{-- =============================================== --}}
+
+        {{-- Desktop Table --}}
+        <div class="hidden md:block">
+            @if($customerBookings->isEmpty())
+                <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
+                    <i class="bi bi-person-x text-4xl text-gray-400"></i>
+                    <p class="mt-4 text-gray-500">No customer bookings found for the selected filters.</p>
+                </div>
+            @else
+                <div class="overflow-x-auto shadow-md rounded-xl border border-gray-100">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-zinc-800">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Booked By</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Field</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Date & Time</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-lime-300 uppercase tracking-wider">Status</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            <div class="mt-4">
-                {{ $customerBookings->appends(request()->query())->links() }}
-            </div>
-        @endif
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach($customerBookings as $booking)
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">{{ $booking->user->full_name ?? 'N/A' }}</div>
+                                        <div class="text-sm text-gray-500">{{ $booking->user->user_Email ?? 'N/A' }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->field->field_Label ?? 'N/A' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $booking->formattedDate }}, {{ $booking->formattedTime }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                                        @if($booking->display_Status === 'Awaiting Balance')
+                                            <form action="{{ route('staff.payment.markCompleted', $booking->bookingID) }}" method="POST" class="inline-block">
+                                                @csrf
+                                                <button type="button" class="inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition shadow-md record-cash-btn">
+                                                    <i class="bi bi-cash-coin mr-1.5"></i> Record Cash
+                                                </button>
+                                            </form>
+                                        @elseif($booking->display_Status === 'Paid (Deposit)')
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                                <i class="bi bi-calendar-check mr-1.5"></i> Paid (Deposit)
+                                            </span>
+                                        @elseif($booking->display_Status === 'Completed')
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                                <i class="bi bi-check-circle-fill mr-1.5"></i> Completed
+                                            </span>
+                                        @elseif($booking->display_Status === 'Expired')
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                                                <i class="bi bi-clock-history mr-1.5"></i> Expired
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                                {{ $booking->display_Status }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4">
+                    {{ $customerBookings->appends(request()->query())->links() }}
+                </div>
+            @endif
+        </div>
+
+        {{-- Mobile Card View --}}
+        <div class="md:hidden space-y-4">
+            @forelse($customerBookings as $booking)
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="font-bold text-gray-900">{{ $booking->user->full_name ?? 'N/A' }}</div>
+                        <div class="text-sm text-gray-500">{{ $booking->formattedDate }}</div>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-1"><strong>Email:</strong> {{ $booking->user->user_Email ?? 'N/A' }}</div>
+                    <div class="text-sm text-gray-500 mb-1"><strong>Field:</strong> {{ $booking->field->field_Label ?? 'N/A' }}</div>
+                    <div class="text-sm text-gray-500 mb-1"><strong>Time:</strong> {{ $booking->formattedTime }}</div>
+                    <div class="mt-2">
+                        @if($booking->display_Status === 'Awaiting Balance')
+                            <form action="{{ route('staff.payment.markCompleted', $booking->bookingID) }}" method="POST" class="inline-block w-full">
+                                @csrf
+                                <button type="button" class="w-full inline-flex justify-center items-center px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 transition shadow-md record-cash-btn">
+                                    <i class="bi bi-cash-coin mr-1.5"></i> Record Cash
+                                </button>
+                            </form>
+                        @elseif($booking->display_Status === 'Paid (Deposit)')
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                <i class="bi bi-calendar-check mr-1.5"></i> Paid (Deposit)
+                            </span>
+                        @elseif($booking->display_Status === 'Completed')
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                <i class="bi bi-check-circle-fill mr-1.5"></i> Completed
+                            </span>
+                        @elseif($booking->display_Status === 'Expired')
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                                <i class="bi bi-clock-history mr-1.5"></i> Expired
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                {{ $booking->display_Status }}
+                            </span>
+                        @endif
+                    </div>
+                </div>
+            @empty
+                <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
+                    <i class="bi bi-person-x text-4xl text-gray-400"></i>
+                    <p class="mt-4 text-gray-500">No customer bookings found for the selected filters.</p>
+                </div>
+            @endforelse
+        </div>
     </div>
 </div>
+
 @endsection
 
 @push('scripts')
-{{-- SweetAlert2 for success/confirmation messages --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 @if(session('success'))
@@ -190,7 +275,7 @@
         title: 'Success!',
         text: "{{ session('success') }}",
         icon: 'success',
-        confirmButtonColor: '#166534', // green-800
+        confirmButtonColor: '#166534',
         confirmButtonText: 'Okay'
     });
 </script>
@@ -209,52 +294,51 @@
 @endif
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Script for the "Cancel" button
-        const cancelButtons = document.querySelectorAll('.cancel-booking-btn');
-        cancelButtons.forEach(button => {
-            button.addEventListener('click', function (event) {
-                event.preventDefault();
-                const form = this.closest('form');
-                Swal.fire({
-                    title: 'Are you sure?',
-                    text: "This booking will be permanently cancelled!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'Yes, cancel it!',
-                    cancelButtonText: 'Keep it'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
-                });
-            });
-        });
-
-        // --- NEW SCRIPT for "Record Cash" button ---
-        const cashButtons = document.querySelectorAll('.record-cash-btn');
-        cashButtons.forEach(button => {
-            button.addEventListener('click', function (event) {
-                event.preventDefault();
-                const form = this.closest('form');
-                
-                Swal.fire({
-                    title: 'Confirm Cash Payment',
-                    text: "Are you sure you have received the cash payment for this booking's balance?",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#16a34a', // Green
-                    cancelButtonColor: '#6b7280',
-                    confirmButtonText: 'Yes, payment received!'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
-                });
+document.addEventListener('DOMContentLoaded', function () {
+    // Cancel Booking
+    const cancelButtons = document.querySelectorAll('.cancel-booking-btn');
+    cancelButtons.forEach(button => {
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            const form = this.closest('form');
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "This booking will be permanently cancelled!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, cancel it!',
+                cancelButtonText: 'Keep it'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
             });
         });
     });
+
+    // Record Cash Payment
+    const cashButtons = document.querySelectorAll('.record-cash-btn');
+    cashButtons.forEach(button => {
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            const form = this.closest('form');
+            Swal.fire({
+                title: 'Confirm Cash Payment',
+                text: "Are you sure you have received the cash payment for this booking's balance?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#16a34a',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, payment received!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        });
+    });
+});
 </script>
 @endpush

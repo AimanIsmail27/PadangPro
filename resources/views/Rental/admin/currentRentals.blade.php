@@ -22,50 +22,29 @@
             <p class="mt-2 text-gray-500">There are no current or upcoming rentals at this time.</p>
         </div>
     @else
-        <div class="overflow-x-auto shadow-md rounded-xl border border-gray-100">
+        {{-- Desktop Table --}}
+        <div class="hidden md:block overflow-x-auto shadow-md rounded-xl border border-gray-100">
             <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-800"> {{-- Admin Theme Header --}}
+                <thead class="bg-gray-800">
                     <tr>
-                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                            Rental ID
-                        </th>
-                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                            Item
-                        </th>
-                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                            Start Date
-                        </th>
-                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                            End Date
-                        </th>
-                        <th scope="col" class="px-6 py-4 text-center text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                            Quantity
-                        </th>
-                        <th scope="col" class="px-6 py-4 text-center text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                            Status
-                        </th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">Rental ID</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">Item</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">Start Date</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-amber-300 uppercase tracking-wider">End Date</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-amber-300 uppercase tracking-wider">Quantity</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-amber-300 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($rentals as $rental)
                         <tr class="hover:bg-gray-50/50 transition-all">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {{ $rental->rentalID }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                {{ $rental->item->item_Name ?? 'N/A' }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                {{ \Carbon\Carbon::parse($rental->rental_StartDate)->format('d M Y') }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                {{ \Carbon\Carbon::parse($rental->rental_EndDate)->format('d M Y') }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
-                                {{ $rental->quantity }}
-                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $rental->rentalID }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $rental->item->item_Name ?? 'N/A' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ \Carbon\Carbon::parse($rental->rental_StartDate)->format('d M Y') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ \Carbon\Carbon::parse($rental->rental_EndDate)->format('d M Y') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">{{ $rental->quantity }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold 
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
                                     {{ strtolower($rental->rental_Status) == 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
                                     {{ ucfirst($rental->rental_Status) }}
                                 </span>
@@ -74,6 +53,35 @@
                     @endforeach
                 </tbody>
             </table>
+            {{-- Desktop Pagination --}}
+            <div class="mt-4">
+                {{ $rentals->links('pagination::tailwind') }}
+            </div>
+        </div>
+
+        {{-- Mobile Card View --}}
+        <div class="md:hidden space-y-4">
+            @foreach($rentals as $rental)
+                <div class="border rounded-xl shadow p-4 bg-gray-50">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-semibold text-gray-900 text-lg">Rental #{{ $rental->rentalID }}</h3>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
+                            {{ strtolower($rental->rental_Status) == 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                            {{ ucfirst($rental->rental_Status) }}
+                        </span>
+                    </div>
+                    <div class="text-gray-700 text-sm space-y-1">
+                        <p><strong>Item:</strong> {{ $rental->item->item_Name ?? 'N/A' }}</p>
+                        <p><strong>Start Date:</strong> {{ \Carbon\Carbon::parse($rental->rental_StartDate)->format('d M Y') }}</p>
+                        <p><strong>End Date:</strong> {{ \Carbon\Carbon::parse($rental->rental_EndDate)->format('d M Y') }}</p>
+                        <p><strong>Quantity:</strong> {{ $rental->quantity }}</p>
+                    </div>
+                </div>
+            @endforeach
+            {{-- Mobile Pagination --}}
+            <div class="mt-4">
+                {{ $rentals->links('pagination::tailwind') }}
+            </div>
         </div>
     @endif
 </div>

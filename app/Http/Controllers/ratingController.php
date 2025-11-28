@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-// We no longer need the manual paginator
-// use Illuminate\Pagination\LengthAwarePaginator; 
 use App\Models\Rating;
 use App\Models\Customer; 
 use App\Models\Booking;
@@ -12,23 +10,22 @@ use App\Models\Rental;
 use App\Models\Advertisement;
 use App\Models\Applications;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class RatingController extends Controller
 {
     /**
-     * Display the main rating and review page for either a customer or an admin.
+     * Display the main rating and review page for customer, admin, or staff.
      */
     public function showCustomerRatings(Request $request)
     {
         $currentUserID = $request->session()->get('user_id');
         $userType = $request->session()->get('user_type');
 
-        // Start a query to fetch all ratings and eager load the related customer and user details
-        $allRatingsQuery = Rating::with('customer.user');
+        // Start a query to fetch all ratings
+        $allRatingsQuery = Rating::with(['customer.user', 'booking.field', 'rental.item']);
 
-        // ======================
-        // EFFICIENT Sorting Logic (at database level)
-        // ======================
+        // Sorting Logic
         $sortBy = $request->get('filter', 'latest');
         switch ($sortBy) {
             case 'oldest':
@@ -45,96 +42,134 @@ class RatingController extends Controller
                 break;
         }
 
-        // ======================
-        // EFFICIENT Pagination (at database level)
-        // ======================
-        // Paginate the results and append the filter query to the pagination links
+        // Paginate the results
         $paginatedRatings = $allRatingsQuery->paginate(5)->appends($request->query());
 
-        // --- ROLE-SPECIFIC LOGIC ---
-        if ($userType === 'administrator') {
-            // Admin View: Simply show all ratings.
-            return view('Rating.admin.MainRatingPage', [
+        if ($userType === 'administrator' || $userType === 'staff') {
+            // Admin/Staff View: Show all ratings
+            $viewPath = 'Rating.' . $userType . '.MainRatingPage';
+            return view($viewPath, [
                 'allRatings' => $paginatedRatings,
                 'currentSort' => $sortBy,
             ]);
-        } 
-         else if ($userType === 'staff') {
-            // Admin View: Simply show all ratings.
-            return view('Rating.staff.MainRatingPage', [
-                'allRatings' => $paginatedRatings,
-                'currentSort' => $sortBy,
-            ]);
-        }
-        else {
-            // Customer View: Also fetch their own review to display separately.
-            $yourSubmittedReview = Rating::with('customer')->where('userID', $currentUserID)->first();
+        } else {
+            // Customer View: Show "My Reviews" list for management
+            // We fetch ALL reviews by this user so they can see/edit/delete them
+            $myReviews = Rating::with(['booking.field', 'rental.item'])
+                ->where('userID', $currentUserID)
+                ->latest('review_Date')
+                ->get();
             
             return view('Rating.customer.MainRatingPage', [
-                'yourSubmittedReview' => $yourSubmittedReview,
-                'allRatings' => $paginatedRatings,
+                'myReviews' => $myReviews, // Pass the collection of user's reviews
+                'allRatings' => $paginatedRatings, // General list (optional, if you still want to show others')
                 'currentSort' => $sortBy,
             ]);
         }
     }
 
-    // ======================================================================
-    // ALL OTHER METHODS BELOW ARE CUSTOMER-SPECIFIC AND REMAIN UNCHANGED
-    // ======================================================================
+    // =================================================================
+    // NEW: TRANSACTION-SPECIFIC REVIEWS
+    // =================================================================
 
     /**
-     * Show Add New Review Form
+     * Show form to rate a specific Booking.
      */
-    public function showAddReviewForm()
+    public function rateBooking($bookingID)
     {
-        return view('Rating.customer.addPage');
+        $userId = session('user_id');
+        
+        // Verify ownership and status
+        $booking = Booking::with('field')
+            ->where('bookingID', $bookingID)
+            ->where('userID', $userId)
+            ->where('booking_Status', 'completed')
+            ->firstOrFail();
+
+        // Check if already rated
+        if (Rating::where('bookingID', $bookingID)->exists()) {
+            return redirect()->route('booking.view')->with('error', 'You have already rated this booking.');
+        }
+
+        return view('Rating.customer.createSpecific', [
+            'target' => $booking,
+            'type' => 'booking',
+            'name' => $booking->field->field_Label
+        ]);
     }
 
     /**
-     * Store a new rating and review with eligibility check.
+     * Show form to rate a specific Rental.
      */
-    public function addNewReview(Request $request)
+    public function rateRental($rentalID)
     {
-        $currentUserID = $request->session()->get('user_id');
+        $userId = session('user_id');
 
-        $customer = Customer::where('userID', $currentUserID)->first();
-        $customerID = $customer ? $customer->customerID : null;
+        // Verify ownership and status
+        $rental = Rental::with('item')
+            ->where('rentalID', $rentalID)
+            ->where('userID', $userId)
+            ->where('rental_Status', 'completed')
+            ->where('return_Status', 'approved')
+            ->firstOrFail();
 
-        // Eligibility Check
-        $hasBooking = Booking::where('userID', $currentUserID)->where('booking_Status', 'completed')->exists();
-        $hasRental = Rental::where('userID', $currentUserID)->where('rental_Status', 'paid')->exists();
-        $hasAdvertisement = false;
-        $hasApplication = false;
-        if ($customerID) {
-            $hasAdvertisement = Advertisement::where('customerID', $customerID)->exists();
-            $hasApplication = Applications::where('customerID', $customerID)->exists();
-        }
-        if (!$hasBooking && !$hasRental && !$hasAdvertisement && !$hasApplication) {
-            return redirect()->back()->with('error', 'You must have at least one completed activity (booking, rental, or matchmaking) before posting a review.');
+        // Check if already rated
+        if (Rating::where('rentalID', $rentalID)->exists()) {
+            return redirect()->route('customer.rental.history')->with('error', 'You have already rated this rental.');
         }
 
-        $validated = $request->validate([
+        return view('Rating.customer.createSpecific', [
+            'target' => $rental,
+            'type' => 'rental',
+            'name' => $rental->item->item_Name
+        ]);
+    }
+
+    /**
+     * Store the specific review.
+     */
+    public function storeSpecificReview(Request $request)
+    {
+        $request->validate([
             'rating_Score' => 'required|integer|min:1|max:5',
             'review_Given' => 'required|string|max:255',
+            'type'         => 'required|in:booking,rental',
+            'id'           => 'required|string'
         ]);
 
+        $userId = session('user_id');
         $nowKL = Carbon::now('Asia/Kuala_Lumpur');
         $uniqueID = 'RAT' . strtoupper(uniqid());
 
-        Rating::create([
+        $data = [
             'ratingID' => $uniqueID,
-            'rating_Score' => $validated['rating_Score'],
-            'review_Given' => $validated['review_Given'],
+            'rating_Score' => $request->rating_Score,
+            'review_Given' => $request->review_Given,
             'review_Date' => $nowKL->toDateString(),
             'review_Time' => $nowKL->toDateTimeString(),
-            'userID' => $currentUserID,
-        ]);
+            'userID' => $userId,
+        ];
 
-        return redirect()->route('customer.rating.main')->with('success', 'Your review has been submitted successfully!');
+        // Attach the correct foreign key
+        if ($request->type === 'booking') {
+            $data['bookingID'] = $request->id;
+            $redirectRoute = 'booking.view';
+        } else {
+            $data['rentalID'] = $request->id;
+            $redirectRoute = 'customer.rental.history';
+        }
+
+        Rating::create($data);
+
+        return redirect()->route($redirectRoute)->with('success', 'Thank you! Your review has been submitted.');
     }
 
+    // =================================================================
+    // EXISTING METHODS (Edit, Update, Delete, API)
+    // =================================================================
+
     /**
-     * Show the edit review form for a specific rating.
+     * Show the edit review form.
      */
     public function showEditReviewForm($ratingID)
     {
@@ -189,42 +224,32 @@ class RatingController extends Controller
         return redirect()->route('customer.rating.main')->with('success', 'Your review has been deleted successfully.');
     }
 
-   // In app/Http/Controllers/RatingController.php
+    /**
+     * API for Landing Page
+     */
+    public function getLatestReviews()
+    {
+        $reviews = Rating::with('customer')
+            ->whereNotNull('review_Given')
+            ->where('review_Given', '!=', '')
+            ->latest('review_Date')
+            ->take(3)
+            ->get();
 
-public function getLatestReviews()
-{
-    // 1. Use the Rating MODEL to load the customer relationship
-    $reviews = Rating::with('customer')
-        ->whereNotNull('review_Given')   // Only get actual reviews
-        ->where('review_Given', '!=', '') // Ensure review is not empty
-        ->latest('review_Date')          // Get the newest first
-        ->take(3)                        // Limit to 3
-        ->get();
+        $formattedReviews = $reviews->map(function ($review) {
+            $displayName = 'Anonymous Player';
+            if ($review->customer && !empty($review->customer->customer_FullName)) {
+                $nameParts = explode(' ', $review->customer->customer_FullName);
+                $displayName = $nameParts[0];
+            }
+            return [
+                'rating_Score' => $review->rating_Score,
+                'review_Given' => $review->review_Given,
+                'review_Date' => \Carbon\Carbon::parse($review->review_Date)->format('d M Y'),
+                'customer_FullName' => $displayName 
+            ];
+        });
 
-    // 2. Format the data for the JavaScript
-    $formattedReviews = $reviews->map(function ($review) {
-        
-        // --- THIS IS THE NEW LOGIC ---
-        $displayName = 'Anonymous Player'; // Default fallback
-
-        if ($review->customer && !empty($review->customer->customer_FullName)) {
-            // Split the full name by spaces
-            $nameParts = explode(' ', $review->customer->customer_FullName);
-            // Get just the first part (the first name)
-            $displayName = $nameParts[0];
-        }
-        // --- END NEW LOGIC ---
-
-        return [
-            'rating_Score' => $review->rating_Score,
-            'review_Given' => $review->review_Given,
-            'review_Date' => \Carbon\Carbon::parse($review->review_Date)->format('d M Y'),
-            
-            // Use the new $displayName variable
-            'customer_FullName' => $displayName 
-        ];
-    });
-
-    return response()->json($formattedReviews);
-}
+        return response()->json($formattedReviews);
+    }
 }

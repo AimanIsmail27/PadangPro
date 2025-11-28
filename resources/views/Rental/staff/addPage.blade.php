@@ -17,7 +17,8 @@
 
     <h2 class="text-2xl font-bold text-gray-800 mb-6">Item Details</h2>
 
-    <form id="addItemForm" method="POST" action="{{ route('staff.rental.store') }}" class="space-y-6">
+    {{-- Added enctype="multipart/form-data" for file upload --}}
+    <form id="addItemForm" method="POST" action="{{ route('staff.rental.store') }}" enctype="multipart/form-data" class="space-y-6">
         @csrf
         
         <div>
@@ -46,13 +47,28 @@
                       class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-lime-500 focus:border-lime-500"></textarea>
         </div>
 
-        <div>
-            <label for="item_Status" class="block text-sm font-medium text-gray-700">Status</label>
-            <select id="item_Status" name="item_Status" 
-                    class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-lime-500 focus:border-lime-500">
-                <option value="Available" selected>Available</option>
-                <option value="Unavailable">Unavailable</option>
-            </select>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="item_Status" class="block text-sm font-medium text-gray-700">Status</label>
+                <select id="item_Status" name="item_Status" 
+                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-lime-500 focus:border-lime-500">
+                    <option value="Available" selected>Available</option>
+                    <option value="Unavailable">Unavailable</option>
+                </select>
+            </div>
+
+            {{-- NEW: Image Upload Field --}}
+            <div>
+                <label for="item_Image" class="block text-sm font-medium text-gray-700">Item Image</label>
+                <input type="file" name="item_Image" id="item_Image" accept="image/*"
+                       class="mt-1 block w-full text-sm text-gray-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-lime-50 file:text-lime-700
+                              hover:file:bg-lime-100 cursor-pointer border border-gray-300 rounded-md">
+                <p class="text-xs text-gray-500 mt-1">Supported formats: JPEG, PNG, JPG, GIF (Max 2MB)</p>
+            </div>
         </div>
 
         <div class="flex justify-end gap-4 pt-6 border-t">
@@ -69,42 +85,54 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-{{-- SweetAlert2 is already in the main layout, but we'll include it here just in case --}}
+{{-- SweetAlert2 is already in the main layout --}}
 <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.getElementById('addItemForm').addEventListener('submit', function(e) {
     e.preventDefault(); // prevent normal form submission
 
-    let formData = new FormData(this);
+    let formData = new FormData(this); // This automatically grabs file inputs too
 
-    axios.post("{{ route('staff.rental.store') }}", formData)
-        .then(function(response) {
-            Swal.fire({
-                title: 'Success!',
-                text: "Item registered successfully.",
-                icon: 'success',
-                confirmButtonColor: '#166534', // green-800
-                confirmButtonText: 'OK'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    window.location.href = "{{ route('staff.rental.main') }}";
-                }
-            });
-        })
-        .catch(function(error) {
-            let errors = error.response.data.errors || {};
-            let errorMsg = '';
+    axios.post("{{ route('staff.rental.store') }}", formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    })
+    .then(function(response) {
+        Swal.fire({
+            title: 'Success!',
+            text: "Item registered successfully.",
+            icon: 'success',
+            confirmButtonColor: '#166534', // green-800
+            confirmButtonText: 'OK'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = "{{ route('staff.rental.main') }}";
+            }
+        });
+    })
+    .catch(function(error) {
+        console.error(error);
+        let errorMsg = 'Something went wrong!';
+        
+        if (error.response && error.response.data && error.response.data.errors) {
+            let errors = error.response.data.errors;
+            errorMsg = '';
             for (let key in errors) {
                 errorMsg += errors[key].join(', ') + '\n';
             }
-            Swal.fire({
-                title: 'Error!',
-                text: errorMsg || 'Something went wrong!',
-                icon: 'error',
-                confirmButtonColor: '#d33',
-                confirmButtonText: 'OK'
-            });
+        } else if (error.response && error.response.data && error.response.data.message) {
+             errorMsg = error.response.data.message;
+        }
+
+        Swal.fire({
+            title: 'Error!',
+            text: errorMsg,
+            icon: 'error',
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'OK'
         });
+    });
 });
 </script>
 @endpush

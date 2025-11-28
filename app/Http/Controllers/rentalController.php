@@ -5,27 +5,60 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Item;
 use App\Models\Staff;
-use App\Models\Rental; // Make sure Rental model exists
+use App\Models\Rental;
+use App\Models\User; 
+use App\Models\Rating; 
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class RentalController extends Controller
 {
+    /**
+     * Helper to determine user role from session and get the correct view context.
+     */
+    private function getViewContext()
+    {
+        $userType = session('user_type');
+        
+        if (session()->has('user_id')) {
+            if ($userType === 'administrator') {
+                return (object)[
+                    'is_admin_or_staff' => true,
+                    'user_type' => 'admin',
+                    'path' => 'Rental.admin' 
+                ];
+            }
+            if ($userType === 'staff') {
+                return (object)[
+                    'is_admin_or_staff' => true,
+                    'user_type' => 'staff',
+                    'path' => 'Rental.staff' 
+                ];
+            }
+        }
+        
+        return (object)[
+            'is_admin_or_staff' => false,
+            'user_type' => 'customer',
+            'path' => 'Rental.customer'
+        ];
+    }
+
     // =========================
-    // STAFF FUNCTIONS
+    // STAFF / ADMIN FUNCTIONS
     // =========================
 
-    // Display all items for staff
     public function index()
     {
+        $viewContext = $this->getViewContext();
         $availableItems = Item::where('item_Status', 'Available')->get();
         $unavailableItems = Item::where('item_Status', 'Unavailable')->get();
 
-        return view('Rental.staff.MainRentalPage', compact('availableItems', 'unavailableItems'));
+        return view($viewContext->path . '.MainRentalPage', compact('availableItems', 'unavailableItems'));
     }
 
-    // Store new item
     public function store(Request $request)
     {
         $request->validate([
@@ -34,14 +67,12 @@ class RentalController extends Controller
             'item_Price' => 'required|numeric|min:0',
             'item_Description' => 'required|string|max:255',
             'item_Status' => 'required|string|max:20',
+            'item_Image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $userID = $request->session()->get('user_id');
         $staff = Staff::where('userID', $userID)->first();
-
-        if (!$staff) {
-            return redirect()->back()->withErrors('Staff record not found for this user.');
-        }
+        $staffID = $staff ? $staff->staffID : 'ADMIN';
 
         $item = new Item();
         $item->itemID = 'ITEM' . strtoupper(substr(md5(uniqid()), 0, 6));
@@ -50,20 +81,26 @@ class RentalController extends Controller
         $item->item_Price = $request->item_Price;
         $item->item_Description = $request->item_Description;
         $item->item_Status = $request->item_Status;
-        $item->staffID = $staff->staffID;
+        $item->staffID = $staffID;
+
+        if ($request->hasFile('item_Image')) {
+            $path = $request->file('item_Image')->store('items', 'public');
+            $item->item_Image = $path;
+        }
+
         $item->save();
 
-        return redirect()->route('staff.rental.main')->with('success', 'Item added successfully!');
+        $viewContext = $this->getViewContext();
+        return redirect()->route($viewContext->user_type . '.rental.main')->with('success', 'Item added successfully!');
     }
 
-    // Show edit form for staff
     public function edit($itemID)
     {
+        $viewContext = $this->getViewContext();
         $item = Item::where('itemID', $itemID)->firstOrFail();
-        return view('Rental.staff.editPage', compact('item'));
+        return view($viewContext->path . '.editPage', compact('item'));
     }
 
-    // Update item
     public function update(Request $request, $itemID)
     {
         $request->validate([
@@ -72,6 +109,7 @@ class RentalController extends Controller
             'item_Price' => 'required|numeric|min:0',
             'item_Description' => 'required|string|max:255',
             'item_Status' => 'required|string|max:20',
+            'item_Image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $item = Item::where('itemID', $itemID)->firstOrFail();
@@ -82,104 +120,205 @@ class RentalController extends Controller
         $item->item_Description = $request->item_Description;
         $item->item_Status = $request->item_Status;
 
+        if ($request->hasFile('item_Image')) {
+            if ($item->item_Image && Storage::disk('public')->exists($item->item_Image)) {
+                Storage::disk('public')->delete($item->item_Image);
+            }
+            $path = $request->file('item_Image')->store('items', 'public');
+            $item->item_Image = $path;
+        }
+
         $item->save();
 
-        return redirect()->route('staff.rental.main')->with('success', 'Item updated successfully!');
+        $viewContext = $this->getViewContext();
+        return redirect()->route($viewContext->user_type . '.rental.main')->with('success', 'Item updated successfully!');
     }
 
-    // Delete item
     public function destroy($itemID)
     {
+        $isActive = Rental::where('itemID', $itemID)->whereIn('rental_Status', ['paid', 'pending'])->exists();
+        if ($isActive) {
+            return response()->json(['success' => false, 'message' => 'Cannot delete item with active rentals.'], 400);
+        }
+        
         $item = Item::where('itemID', $itemID)->firstOrFail();
+        
+        if ($item->item_Image && Storage::disk('public')->exists($item->item_Image)) {
+            Storage::disk('public')->delete($item->item_Image);
+        }
+
         $item->delete();
 
         return response()->json(['success' => true]);
     }
 
-public function viewReturnApprovals()
-{
-    $rentals = Rental::with('item')
-        ->where('return_Status', 'requested')
-        ->orderBy('rental_StartDate', 'desc')
-        ->get();
+    public function viewReturnApprovals()
+    {
+        $viewContext = $this->getViewContext();
+        $rentals = Rental::with('item', 'customer.user')
+            ->where('return_Status', 'requested')
+            ->orderBy('rental_StartDate', 'desc')
+            ->get();
+        
+        return view($viewContext->path . '.ApproveRent', compact('rentals'));
+    }
 
-    return view('Rental.staff.ApproveRent', compact('rentals'));
+    public function updateReturnApproval(Request $request, $rentalID)
+    {
+        $rental = Rental::findOrFail($rentalID);
+        $rental->return_Status = $request->status;
+        $rental->save();
+
+        if ($request->status === 'approved') {
+            $item = $rental->item;
+            if ($item) {
+                $item->item_Quantity += $rental->quantity;
+                $item->save();
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    // --- STAFF: View Rentals ---
+   public function viewCurrent(Request $request)
+{
+    $viewContext = $this->getViewContext(); // your existing method
+    $now = Carbon::now('Asia/Kuala_Lumpur');
+
+    // Generate month list
+    $monthList = [];
+    for ($i = 0; $i <= 12; $i++) {
+        $date = $now->copy()->subMonths($i);
+        $monthList[$date->format('Y-m')] = $date->format('F Y');
+    }
+
+    $selectedMonth = $request->input('month', $now->format('Y-m'));
+    $rentalDate = $request->input('rental_date'); // exact date filter
+
+    $rentalsQuery = Rental::with(['item', 'user'])
+        ->whereIn('rental_Status', ['paid', 'completed']);
+
+    // Apply exact date filter if provided (overrides month)
+    if ($rentalDate) {
+        $rentalsQuery->whereDate('rental_StartDate', '<=', $rentalDate)
+                    ->whereDate('rental_EndDate', '>=', $rentalDate);
+    }
+    // Else filter by month
+    else {
+        $year = Carbon::parse($selectedMonth)->year;
+        $month = Carbon::parse($selectedMonth)->month;
+        $rentalsQuery->whereYear('rental_StartDate', $year)
+                     ->whereMonth('rental_StartDate', $month);
+    }
+
+    $rentals = $rentalsQuery->orderBy('rental_StartDate', 'desc')
+                            ->paginate(5)
+                            ->appends($request->query());
+
+    // Calculate total cost and deposit
+    $rentals->getCollection()->transform(function ($rental) {
+        if ($rental->item) {
+            $days = Carbon::parse($rental->rental_StartDate)
+                ->diffInDays(Carbon::parse($rental->rental_EndDate)) + 1;
+            $rental->total_cost = $days * $rental->quantity * $rental->item->item_Price;
+            $rental->deposit    = $rental->total_cost * 0.20;
+        } else {
+            $rental->total_cost = 0;
+            $rental->deposit    = 0;
+        }
+        return $rental;
+    });
+
+    return view('Rental.staff.viewRent', compact('rentals', 'monthList', 'selectedMonth', 'rentalDate'));
 }
 
-public function updateReturnApproval(Request $request, $rentalID)
-{
-    $rental = Rental::findOrFail($rentalID);
-    $rental->return_Status = $request->status;
-    $rental->save();
 
-    return response()->json(['success' => true]);
-}
+    // --- ADMIN: View Rentals ---
+    public function viewCurrentAdmin(Request $request)
+    {
+        $now = Carbon::now('Asia/Kuala_Lumpur');
 
-public function viewCurrent()
-{
-    $today = now()->toDateString();
+        $monthList = [];
+        for ($i = 0; $i <= 12; $i++) {
+            $date = $now->copy()->subMonths($i);
+            $monthList[$date->format('Y-m')] = $date->format('F Y');
+        }
+        $selectedMonth = $request->input('month', $now->format('Y-m'));
+        $year = Carbon::parse($selectedMonth)->year;
+        $month = Carbon::parse($selectedMonth)->month;
 
-    $rentals = Rental::where('rental_Status', 'paid')
-        ->whereDate('rental_EndDate', '>=', $today) // not yet ended
-        ->orderBy('rental_StartDate', 'asc')        // soonest start date first
-        ->with('item')                              // eager load item details
-        ->get();
+        $rentals = Rental::with(['item', 'user'])
+            ->whereIn('rental_Status', ['paid', 'completed'])
+            ->whereYear('rental_StartDate', $year)
+            ->whereMonth('rental_StartDate', $month)
+            ->orderBy('rental_StartDate', 'desc')
+            ->paginate(5)
+            ->appends($request->query());
 
-    return view('Rental.staff.viewRent', compact('rentals'));
-}
+        $rentals->getCollection()->transform(function ($rental) {
+            if ($rental->item) {
+                $days = Carbon::parse($rental->rental_StartDate)
+                    ->diffInDays(Carbon::parse($rental->rental_EndDate)) + 1;
+                $rental->total_cost = $days * $rental->quantity * $rental->item->item_Price;
+                $rental->deposit    = $rental->total_cost * 0.20;
+            } else {
+                $rental->total_cost = 0;
+                $rental->deposit    = 0;
+            }
+            return $rental;
+        });
+
+        return view('Rental.admin.currentRentals', compact('rentals', 'monthList', 'selectedMonth'));
+    }
 
 
-
- 
     // =========================
     // CUSTOMER FUNCTIONS
     // =========================
-    // In app/Http/Controllers/RentalController.php
 
-public function indexCustomer(Request $request)
-{
-    // 1. Get the selected date, default to today
-    $selectedDate = $request->input('rental_date', Carbon::now('Asia/Kuala_Lumpur')->toDateString());
+    public function indexCustomer(Request $request)
+    {
+        $selectedDate = $request->input('rental_date', Carbon::now('Asia/Kuala_Lumpur')->toDateString());
+        $availableItems = Item::where('item_Status', 'Available')->get();
 
-    // 2. GET ONLY ITEMS THAT ARE PERMANENTLY "Available"
-    //    This is the main fix.
-    $availableItems = Item::where('item_Status', 'Available')->get();
+        $rentedQuantities = DB::table('rental')
+            ->where('rental_Status', 'paid')
+            ->whereDate('rental_StartDate', '<=', $selectedDate)
+            ->whereDate('rental_EndDate', '>=', $selectedDate)
+            ->groupBy('itemID')
+            ->select('itemID', DB::raw('SUM(quantity) as rented_quantity'))
+            ->get()
+            ->keyBy('itemID');
 
-    // 3. Get all rented quantities for the selected date
-    $rentedQuantities = DB::table('rental')
-        ->where('rental_Status', 'paid') // Only count paid rentals
-        ->whereDate('rental_StartDate', '<=', $selectedDate)
-        ->whereDate('rental_EndDate', '>=', $selectedDate)
-        ->groupBy('itemID')
-        ->select('itemID', DB::raw('SUM(quantity) as rented_quantity'))
-        ->get()
-        ->keyBy('itemID'); // Makes it easy to look up by itemID
+        $itemsForView = $availableItems->map(function ($item) use ($rentedQuantities) {
+            $rented = $rentedQuantities->get($item->itemID);
+            $rentedCount = $rented ? $rented->rented_quantity : 0;
+            $item->available_quantity = $item->item_Quantity - $rentedCount; 
 
-    // 4. Calculate the *true* available quantity for each item
-    $itemsForView = $availableItems->map(function ($item) use ($rentedQuantities) {
-        $rented = $rentedQuantities->get($item->itemID);
-        $rentedCount = $rented ? $rented->rented_quantity : 0;
-        
-        // Calculate the quantity available *for that day*
-        $item->available_quantity = $item->item_Quantity - $rentedCount; 
-        
-        return $item;
-    })
-    ->filter(function ($item) {
-        // 5. Only show items that have at least 1 available for rent today
-        return $item->available_quantity > 0;
-    });
+            // Rating Calculation
+            $item->avg_rating = Rating::whereHas('rental', function($q) use ($item) {
+                $q->where('itemID', $item->itemID);
+            })->avg('rating_Score') ?? 0;
 
-    return view('Rental.customer.MainRentalPage', [
-        'availableItems' => $itemsForView,
-        'selectedDate' => $selectedDate,
-        // We add this for the SweetAlerts
-        'success' => session('success'),
-        'error' => session('error'),
-    ]);
-}
+            $item->rating_count = Rating::whereHas('rental', function($q) use ($item) {
+                $q->where('itemID', $item->itemID);
+            })->count();
+            
+            return $item;
+        })
+        ->filter(function ($item) {
+            return $item->available_quantity > 0;
+        });
 
-    // Show Rent Page for a specific item
+        return view('Rental.customer.MainRentalPage', [
+            'availableItems' => $itemsForView,
+            'selectedDate' => $selectedDate,
+            'success' => session('success'),
+            'error' => session('error'),
+        ]);
+    }
+
     public function rentPage(Request $request, $itemID)
     {
         $item = Item::findOrFail($itemID);
@@ -198,7 +337,7 @@ public function indexCustomer(Request $request)
             $d = $date->format('Y-m-d');
 
             $bookedQuantity = Rental::where('itemID', $item->itemID)
-                ->where('rental_Status', 'Pending')
+                ->where('rental_Status', 'paid')
                 ->whereDate('rental_StartDate', '<=', $d)
                 ->whereDate('rental_EndDate', '>=', $d)
                 ->sum('quantity');
@@ -207,11 +346,25 @@ public function indexCustomer(Request $request)
         }
 
         $availableQuantity = min($availableQuantities);
+        if($availableQuantity < 0) $availableQuantity = 0;
 
-        return view('Rental.customer.addPage', compact('item', 'availableQuantity', 'startDate', 'endDate'));
+        // Reviews
+        $reviews = Rating::whereHas('rental', function ($query) use ($itemID) {
+                $query->where('itemID', $itemID);
+            })
+            ->with('customer.user')
+            ->latest('review_Date')
+            ->paginate(3);
+
+        $averageRating = Rating::whereHas('rental', function ($query) use ($itemID) {
+                $query->where('itemID', $itemID);
+            })->avg('rating_Score');
+
+        $totalReviews = $reviews->total();
+
+        return view('Rental.customer.addPage', compact('item', 'availableQuantity', 'startDate', 'endDate', 'reviews', 'averageRating', 'totalReviews'));
     }
 
-    // Process Rent Form Submission (insert into DB immediately)
     public function processRent(Request $request, $itemID)
     {
         $request->validate([
@@ -227,7 +380,7 @@ public function indexCustomer(Request $request)
         $item = Item::findOrFail($itemID);
 
         $bookedQuantity = Rental::where('itemID', $item->itemID)
-            ->where('rental_Status', 'Pending')
+            ->where('rental_Status', 'paid')
             ->where(function ($query) use ($request) {
                 $query->whereBetween('rental_StartDate', [$request->rental_date, $request->rental_end_date])
                       ->orWhereBetween('rental_EndDate', [$request->rental_date, $request->rental_end_date]);
@@ -240,7 +393,6 @@ public function indexCustomer(Request $request)
             return redirect()->back()->with('error', 'Requested quantity exceeds available items for the selected dates.');
         }
 
-        // Insert rental directly into DB
         $rental = new Rental();
         $rental->rentalID          = 'RENT' . strtoupper(substr(md5(uniqid()), 0, 6));
         $rental->rental_Name       = $request->rental_name;
@@ -255,16 +407,13 @@ public function indexCustomer(Request $request)
         $rental->quantity          = $request->quantity;
         $rental->save();
 
-        // Redirect to confirmation with rentalID
         return redirect()->route('customer.rental.confirmation', ['rentalID' => $rental->rentalID]);
     }
 
-    // Show Confirmation Page (now fetch from DB)
     public function showConfirmation($rentalID)
     {
         $rentalData = Rental::with('item')->where('rentalID', $rentalID)->firstOrFail();
 
-        // Calculate number of days and total price
         $start = Carbon::parse($rentalData->rental_StartDate);
         $end   = Carbon::parse($rentalData->rental_EndDate);
         $days  = $start->diffInDays($end) + 1;
@@ -273,211 +422,154 @@ public function indexCustomer(Request $request)
         $pricePerItem = $rentalData->item->item_Price ?? 0;
         $total = $quantity * $pricePerItem * $days;
         $deposit = $total * 0.20;
-        
 
         return view('Rental.customer.confirmation', compact('rentalData', 'days', 'total', 'deposit'));
     }
 
-    // Check Availability (AJAX support)
-// Check Availability (AJAX support)
-public function checkAvailability(Request $request, $itemID)
-{
-    try {
-        $startDate = $request->query('start_date');
-        $endDate   = $request->query('end_date');
-        $rentalID  = $request->query('rental_id'); // optional
+    public function checkAvailability(Request $request, $itemID)
+    {
+        try {
+            $startDate = $request->query('start_date');
+            $endDate   = $request->query('end_date');
+            $rentalID  = $request->query('rental_id'); 
 
-        if (!$startDate || !$endDate) {
-            return response()->json(['error' => 'Start date and end date are required'], 400);
-        }
-
-        $item = Item::findOrFail($itemID);
-
-        $period = new \DatePeriod(
-            new \DateTime($startDate),
-            new \DateInterval('P1D'),
-            (new \DateTime($endDate))->modify('+1 day')
-        );
-
-        $availableQuantities = [];
-        foreach ($period as $date) {
-            $d = $date->format('Y-m-d');
-
-            // Count booked by others (exclude current rental if rental_id passed)
-            $query = Rental::where('itemID', $itemID)
-                ->whereIn('rental_Status', ['Pending', 'paid'])
-                ->whereDate('rental_StartDate', '<=', $d)
-                ->whereDate('rental_EndDate', '>=', $d);
-
-            if ($rentalID) {
-                $query->where('rentalID', '!=', $rentalID);
+            if (!$startDate || !$endDate) {
+                return response()->json(['error' => 'Start date and end date are required'], 400);
             }
 
-            $bookedQuantity = $query->sum('quantity');
+            $item = Item::findOrFail($itemID);
 
-            // Available = total stock - booked by others for this day
-            $availableForThisDay = $item->item_Quantity - $bookedQuantity;
+            $period = new \DatePeriod(
+                new \DateTime($startDate),
+                new \DateInterval('P1D'),
+                (new \DateTime($endDate))->modify('+1 day')
+            );
 
-            // Clamp within [0, total_stock]
-            $availableForThisDay = max(min($availableForThisDay, $item->item_Quantity), 0);
+            $availableQuantities = [];
+            foreach ($period as $date) {
+                $d = $date->format('Y-m-d');
 
-            $availableQuantities[] = $availableForThisDay;
+                $query = Rental::where('itemID', $itemID)
+                    ->whereIn('rental_Status', ['paid']) // Only confirmed rentals block stock
+                    ->whereDate('rental_StartDate', '<=', $d)
+                    ->whereDate('rental_EndDate', '>=', $d);
+
+                if ($rentalID) {
+                    $query->where('rentalID', '!=', $rentalID);
+                }
+
+                $bookedQuantity = $query->sum('quantity');
+                $availableForThisDay = max($item->item_Quantity - $bookedQuantity, 0);
+                $availableQuantities[] = $availableForThisDay;
+            }
+
+            $maxAvailable = min($availableQuantities);
+
+            return response()->json(['max_quantity' => $maxAvailable]);
+        } catch (\Exception $e) {
+            \Log::error('checkAvailability error: '.$e->getMessage());
+            return response()->json(['error' => 'Could not check availability. Please try again later.'], 500);
+        }
+    }
+
+    public function editPage($rentalID)
+    {
+        $rental = Rental::with('item')->findOrFail($rentalID);
+        $item = $rental->item;
+        $availableQuantity = $item->item_Quantity;
+        
+        return view('Rental.customer.editPage', compact('rental', 'item', 'availableQuantity'));
+    }
+
+    public function updateRent(Request $request, $rentalID)
+    {
+        $rental = Rental::findOrFail($rentalID);
+        $rental->update($request->all());
+        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rental->rentalID]);
+    }
+
+    public function destroyCustomer($rentalID)
+    {
+        \DB::table('rental')->where('rentalID', $rentalID)->delete();
+        return redirect()->route('customer.rental.main')->with('success', 'Rental Cancelled successfully.');
+    }
+
+    public function viewRentalHistory(Request $request)
+    {
+        $userID = $request->session()->get('user_id');
+        $now = Carbon::now('Asia/Kuala_Lumpur');
+
+        // 1. Month List Generation
+        $monthList = [];
+        for ($i = 6; $i >= 0; $i--) { 
+            $date = $now->copy()->subMonths($i); 
+            $monthList[$date->format('Y-m')] = $date->format('F Y'); 
+        }
+        for ($i = 1; $i <= 6; $i++) { 
+            $date = $now->copy()->addMonths($i); 
+            $monthList[$date->format('Y-m')] = $date->format('F Y'); 
         }
 
-        $maxAvailable = min($availableQuantities);
+        $selectedMonth = $request->input('month', $now->format('Y-m'));
+        $year = Carbon::parse($selectedMonth)->year;
+        $month = Carbon::parse($selectedMonth)->month;
 
-        return response()->json(['max_quantity' => $maxAvailable]);
-    } catch (\Exception $e) {
-        \Log::error('checkAvailability error: '.$e->getMessage());
-        return response()->json(['error' => 'Could not check availability. Please try again later.'], 500);
-    }
-}
+        // 2. Active Query (Paid / Ongoing / Requested Return)
+        $activeQuery = Rental::with('item')
+            ->where('userID', $userID)
+            ->where('rental_Status', 'paid') 
+            ->where(function($q) {
+                $q->whereNull('return_Status')
+                  ->orWhere('return_Status', 'requested'); 
+            })
+            ->whereYear('rental_StartDate', $year)
+            ->whereMonth('rental_StartDate', $month)
+            ->orderBy('rental_StartDate', 'asc');
 
+        $activeRentals = $activeQuery->paginate(5, ['*'], 'active_page')->appends($request->query());
+        $activeRentals->getCollection()->transform(fn ($r) => $this->calculateRentalCosts($r));
 
-// Show edit form
-public function editPage($rentalID)
-{
-    $rental = Rental::with('item')->findOrFail($rentalID);
+        // 3. History Query (Completed Cycle: Paid Full, Approved Return, or Failed)
+        $historyQuery = Rental::with('item')
+            ->where('userID', $userID)
+            ->where(function($q) {
+                $q->whereIn('rental_Status', ['completed', 'failed']) // Completed/Failed payment is a history state
+                  ->orWhereIn('return_Status', ['approved', 'rejected']); // Approved/Rejected return is a history state
+            })
+            ->whereYear('rental_StartDate', $year)
+            ->whereMonth('rental_StartDate', $month)
+            ->orderBy('rental_StartDate', 'desc');
 
-    $item = $rental->item;
-    $period = new \DatePeriod(
-        new \DateTime($rental->rental_StartDate),
-        new \DateInterval('P1D'),
-        (new \DateTime($rental->rental_EndDate))->modify('+1 day')
-    );
+        $rentalHistory = $historyQuery->paginate(5, ['*'], 'history_page')->appends($request->query());
+        $rentalHistory->getCollection()->transform(fn ($r) => $this->calculateRentalCosts($r));
 
-    $availableQuantities = [];
-    foreach ($period as $date) {
-        $d = $date->format('Y-m-d');
-
-        // Booked by others (excluding this rental)
-        $bookedQuantity = Rental::where('itemID', $item->itemID)
-            ->where('rentalID', '!=', $rentalID)
-            ->where('rental_Status', 'Pending')
-            ->whereDate('rental_StartDate', '<=', $d)
-            ->whereDate('rental_EndDate', '>=', $d)
-            ->sum('quantity');
-
-        // Availability for this day = total stock - booked by others
-        $availableForThisDay = $item->item_Quantity - $bookedQuantity;
-
-        // Clamp within [0, total_stock]
-        $availableForThisDay = max(min($availableForThisDay, $item->item_Quantity), 0);
-
-        $availableQuantities[] = $availableForThisDay;
+        return view('Rental.customer.viewRental', [
+            'activeRentals' => $activeRentals,
+            'rentalHistory' => $rentalHistory,
+            'monthList'     => $monthList,
+            'selectedMonth' => $selectedMonth
+        ]);
     }
 
-    // Take the min across the days
-    $availableQuantity = min($availableQuantities);
-
-    return view('Rental.customer.editPage', compact('rental', 'item', 'availableQuantity'));
-}
-
-
-// Handle edit submission (small suggested improvement to overlap check)
-public function updateRent(Request $request, $rentalID)
-{
-    $request->validate([
-        'rental_name'     => 'required|string|max:50',
-        'rental_email'    => 'nullable|email|max:50',
-        'rental_phone'    => 'required|string|max:20',
-        'rental_backup'   => 'nullable|string|max:20',
-        'rental_date'     => 'required|date',
-        'rental_end_date' => 'required|date|after_or_equal:rental_date',
-        'quantity'        => 'required|integer|min:1',
-    ]);
-
-    $rental = Rental::findOrFail($rentalID);
-    $item   = Item::findOrFail($rental->itemID);
-
-    // Check booked quantity by others using proper date-overlap test
-    $bookedQuantity = Rental::where('itemID', $item->itemID)
-        ->where('rentalID', '!=', $rentalID)
-        ->where('rental_Status', 'Pending')
-        ->whereDate('rental_StartDate', '<=', $request->rental_end_date)
-        ->whereDate('rental_EndDate', '>=', $request->rental_date)
-        ->sum('quantity');
-
-    $availableQuantity = $item->item_Quantity - $bookedQuantity;
-
-    if ($request->quantity > $availableQuantity) {
-        return redirect()->back()->with('error', 'Requested quantity exceeds available items for the selected dates.');
+    private function calculateRentalCosts($rental)
+    {
+        if ($rental->item) {
+            $days = Carbon::parse($rental->rental_StartDate)
+                ->diffInDays(Carbon::parse($rental->rental_EndDate)) + 1;
+            $rental->total_cost = $days * $rental->quantity * $rental->item->item_Price;
+            $rental->deposit    = $rental->total_cost * 0.20;
+        } else {
+            $rental->total_cost = 0;
+            $rental->deposit    = 0;
+        }
+        return $rental;
     }
 
-    // Update rental
-    $rental->rental_Name        = $request->rental_name;
-    $rental->rental_Email       = $request->rental_email ?? '';
-    $rental->rental_PhoneNumber = $request->rental_phone;
-    $rental->rental_BackupNumber= $request->rental_backup ?? '';
-    $rental->rental_StartDate   = $request->rental_date;
-    $rental->rental_EndDate     = $request->rental_end_date;
-    $rental->quantity           = $request->quantity;
-    $rental->save();
-
-    // Redirect back to confirmation
-    return redirect()->route('customer.rental.confirmation', ['rentalID' => $rental->rentalID]);
-}
-
-public function destroyCustomer($rentalID)
-{
-    \DB::table('rental')->where('rentalID', $rentalID)->delete();
-
-    return redirect()
-        ->route('customer.rental.main')
-        ->with('success', 'Rental Cancelled successfully.');
-}
-
-// View Rental History
-
-public function viewRentalHistory(Request $request)
-{
-    $userID = $request->session()->get('user_id');
-
-    $rentals = Rental::with('item')
-        ->where('userID', $userID)
-        ->orderBy('rental_StartDate', 'desc')
-        ->get()
-        ->map(function ($rental) {
-            if ($rental->item) {
-                $days = Carbon::parse($rental->rental_StartDate)
-                    ->diffInDays(Carbon::parse($rental->rental_EndDate)) + 1;
-
-                $rental->total_cost = $days * $rental->quantity * $rental->item->item_Price;
-                $rental->deposit    = $rental->total_cost * 0.20;
-            } else {
-                $rental->total_cost = 0;
-                $rental->deposit    = 0;
-            }
-            return $rental;
-        });
-
-    return view('Rental.customer.viewRental', compact('rentals'));
-}
-
-public function requestApproval($rentalId)
-{
-    $rental = Rental::findOrFail($rentalId);
-    $rental->return_Status = 'Requested'; // or 'Waiting Approval'
-    $rental->save();
-
-    return redirect()->back()->with('success', 'Your request has been sent for approval.');
-}
-
-
-public function viewCurrentAdmin()
-{
-    $today = now()->toDateString();
-
-    $rentals = Rental::where('rental_Status', 'paid')
-        ->whereDate('rental_EndDate', '>=', $today)
-        ->orderBy('rental_StartDate', 'asc')
-        ->with('item')
-        ->get();
-
-    // This points to a new view in the admin folder
-    return view('Rental.admin.currentRentals', compact('rentals'));
-}
-
-
-
+    public function requestApproval($rentalId)
+    {
+        $rental = Rental::findOrFail($rentalId);
+        $rental->return_Status = 'Requested'; 
+        $rental->save();
+        return redirect()->back()->with('success', 'Your request has been sent for approval.');
+    }
 }

@@ -30,6 +30,7 @@ class Staff extends Model
         'staff_PhoneNumber',
         'staff_Address',
         'staff_Job',
+        'staff_image',
         'userID'
     ];
 

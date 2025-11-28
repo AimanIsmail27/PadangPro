@@ -10,7 +10,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RentalController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\RatingController;
-use App\Http\Controllers\ReportController; // Fixed casing
+use App\Http\Controllers\ReportController; 
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\AuthSession;
 
@@ -33,7 +33,9 @@ Route::get('customer/rental/payment/return', [PaymentController::class, 'rentalP
 Route::post('customer/rental/payment/callback', [PaymentController::class, 'rentalPaymentCallback'])->name('customer.rental.payment.callback');
 Route::get('/payment/return-balance', [PaymentController::class, 'paymentReturnBalance'])->name('payment.return.balance');
 Route::post('/payment/callback-balance', [PaymentController::class, 'paymentCallbackBalance'])->name('payment.callback.balance');
-
+// --- NEW: Rental Balance Payment Callbacks ---
+Route::get('/payment/rental/balance/return', [PaymentController::class, 'rentalBalanceReturn'])->name('payment.rental.balance.return');
+Route::post('/payment/rental/balance/callback', [PaymentController::class, 'rentalBalanceCallback'])->name('payment.rental.balance.callback');
 // =================================================================
 // AUTHENTICATION ROUTES (Login, Register, Logout)
 // =================================================================
@@ -118,7 +120,7 @@ Route::middleware([AuthSession::class, PreventBackHistory::class])->group(functi
     Route::middleware('role:customer')->group(function () {
         Route::get('/payment/create/{bookingID}', [PaymentController::class, 'createPayment'])->name('payment.create');
         Route::get('/payment/balance/{bookingID}', [PaymentController::class, 'createBalancePayment'])->name('payment.balance.create');
-    });
+Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'createRentalBalancePayment'])->name('payment.rental.balance.create');    });
 
     // --- CUSTOMER: Rental Routes ---
     Route::prefix('customer/rental')->name('customer.rental.')->middleware('role:customer')->group(function() {
@@ -156,7 +158,7 @@ Route::middleware([AuthSession::class, PreventBackHistory::class])->group(functi
         Route::post('/applications/{id}/reject', [MatchController::class, 'reject'])->name('applications.reject');
     });
 
-    // --- CUSTOMER: Rating & Review Routes ---
+   // --- CUSTOMER: Rating & Review Routes ---
     Route::prefix('customer/rating')->name('customer.rating.')->middleware('role:customer')->group(function () {
         Route::get('/', [RatingController::class, 'showCustomerRatings'])->name('main');
         Route::get('/add', [RatingController::class, 'showAddReviewForm'])->name('add');
@@ -164,6 +166,9 @@ Route::middleware([AuthSession::class, PreventBackHistory::class])->group(functi
         Route::get('/edit/{ratingID}', [RatingController::class, 'showEditReviewForm'])->name('edit');
         Route::post('/update/{ratingID}', [RatingController::class, 'updateReview'])->name('update');
         Route::get('/delete/{ratingID}', [RatingController::class, 'deleteReview'])->name('delete');
+        Route::get('/booking/{bookingID}', [RatingController::class, 'rateBooking'])->name('booking');
+        Route::get('/rental/{rentalID}', [RatingController::class, 'rateRental'])->name('rental');
+        Route::post('/store-specific', [RatingController::class, 'storeSpecificReview'])->name('store_specific');
     });
 
     // --- ADMIN: Booking Routes ---
@@ -217,6 +222,7 @@ Route::middleware([AuthSession::class, PreventBackHistory::class])->group(functi
     // --- STAFF: Payment Routes ---
     Route::prefix('staff/payment')->name('staff.payment.')->middleware('role:staff')->group(function () {
         Route::post('/mark-completed/{bookingID}', [PaymentController::class, 'markAsCompleted'])->name('markCompleted');
+        Route::post('/mark-rental-completed/{rentalID}', [PaymentController::class, 'markRentalAsCompleted'])->name('markRentalCompleted');
     });
     
     // --- STAFF: Rating & Review Routes ---

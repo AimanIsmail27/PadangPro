@@ -8,72 +8,131 @@
 
 @section('content')
 
-<div class="bg-gradient-to-r from-lime-500 to-emerald-600 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
-    <h1 class="text-3xl font-bold">Published Reports</h1>
+{{-- Header --}}
+<div class="bg-gradient-to-r from-lime-500 to-emerald-600 text-white pt-8 pb-24 px-10 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold">Published Reports</h1>
     <p class="mt-2 text-lime-100">View all report configurations saved by administrators and staff.</p>
 </div>
 
-<div class="bg-white rounded-xl shadow-xl border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-16 relative">
+{{-- Main Container --}}
+<div class="bg-white rounded-xl shadow-md border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-16 relative">
 
     @if($savedReports->isEmpty())
-        <div class="text-center py-12 px-6 bg-slate-50 rounded-lg">
-            <i class="bi bi-file-earmark-bar-graph text-6xl text-gray-300"></i>
-            <h3 class="mt-4 text-2xl font-bold text-gray-700">No Published Reports</h3>
-            <p class="mt-2 text-gray-500">No reports have been published yet.</p>
+        <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
+            <i class="bi bi-file-earmark-bar-graph text-4xl text-gray-400"></i>
+            <p class="mt-4 text-gray-500">No reports have been published yet.</p>
         </div>
+
     @else
-        <div class="overflow-x-auto shadow-md rounded-xl border border-gray-100">
+
+        {{-- ======================================================
+             DESKTOP TABLE VIEW (≥640px)
+        ======================================================= --}}
+        <div class="hidden sm:block overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-zinc-800">
+                <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider w-2/5">Report Name</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Report Type</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-lime-300 uppercase tracking-wider">Published By</th>
-                        <th class="px-6 py-4 text-center text-xs font-semibold text-lime-300 uppercase tracking-wider">Actions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">
+                            Report Name
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Report Type
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Published By
+                        </th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                        </th>
                     </tr>
                 </thead>
+
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($savedReports as $report)
-                        <tr class="hover:bg-slate-50/50 transition-colors">
-                            <td class="px-6 py-4 whitespace-normal text-sm font-medium text-gray-900">{{ $report->report_Title }}</td>
-                            
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ ucwords(str_replace('_', ' ', $report->report_type)) }}</td>
-                            
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $report->publisher->full_name ?? 'Unknown' }}</td>
-                            
-                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                {{-- =============================================== --}}
-                                {{-- THIS IS THE CORRECTED LINK COLOR --}}
-                                {{-- =============================================== --}}
-                                <a href="{{ route('staff.reports.show', array_merge(['report_type' => $report->report_type, 'view_only' => 'true'], (array) $report->parameters)) }}" class="text-indigo-600 hover:text-indigo-900 ">
-                                    View Report
-                                </a>
-                                {{-- =============================================== --}}
-                            </td>
-                        </tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
+
+                        {{-- Report Name --}}
+                        <td class="px-6 py-4 whitespace-normal text-sm font-medium text-gray-900">
+                            {{ $report->report_Title }}
+                        </td>
+
+                        {{-- Report Type --}}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {{ ucwords(str_replace('_', ' ', $report->report_type)) }}
+                        </td>
+
+                        {{-- Publisher --}}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {{ $report->publisher->full_name ?? 'Unknown' }}
+                        </td>
+
+                        {{-- View Button --}}
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                            <a href="{{ route('staff.reports.show', array_merge(['report_type' => $report->report_type, 'view_only' => 'true'], (array)$report->parameters)) }}"
+                               class="text-indigo-600 hover:text-indigo-900">
+                                View Report
+                            </a>
+                        </td>
+
+                    </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
-        
-        <div class="mt-8">
+
+        {{-- ======================================================
+                MOBILE CARD VIEW (<640px)
+        ======================================================= --}}
+        <div class="sm:hidden space-y-4 mt-4">
+            @foreach($savedReports as $report)
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm">
+
+                <p class="text-xs text-gray-500 uppercase">Report Name</p>
+                <p class="font-bold text-gray-900 mb-2">
+                    {{ $report->report_Title }}
+                </p>
+
+                <p class="text-xs text-gray-500 uppercase">Report Type</p>
+                <p class="text-gray-800 mb-2">
+                    {{ ucwords(str_replace('_', ' ', $report->report_type)) }}
+                </p>
+
+                <p class="text-xs text-gray-500 uppercase">Published By</p>
+                <p class="text-gray-800 mb-4">
+                    {{ $report->publisher->full_name ?? 'Unknown' }}
+                </p>
+
+                <div class="text-right">
+                    <a href="{{ route('staff.reports.show', array_merge(['report_type' => $report->report_type, 'view_only' => 'true'], (array)$report->parameters)) }}"
+                       class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-semibold shadow hover:bg-indigo-700 transition">
+                       View Report
+                    </a>
+                </div>
+
+            </div>
+            @endforeach
+        </div>
+
+        {{-- Pagination --}}
+        <div class="mt-6">
             {{ $savedReports->links() }}
         </div>
+
     @endif
 </div>
 @endsection
 
-@push('scripts')
 {{-- SweetAlert2 for success messages --}}
 @if(session('success'))
+    @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         Swal.fire({
             title: 'Success!',
             text: "{{ session('success') }}",
             icon: 'success',
-            confirmButtonColor: '#166534', // green-800
             confirmButtonText: 'Okay'
         });
     </script>
+    @endpush
 @endif
-@endpush

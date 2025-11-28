@@ -311,7 +311,7 @@ class ReportController extends Controller
     public function publishedList()
     {
         $viewContext = $this->getViewContext();
-        $savedReports = Report::with('publisher')->latest('reportID')->paginate(10);
+        $savedReports = Report::with('publisher')->latest('reportID')->paginate(5);
         
         // --- THIS IS THE FIX: Return the correct view based on role ---
         return view($viewContext->view_path . '.publishedList', compact('savedReports'));

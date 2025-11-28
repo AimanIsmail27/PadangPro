@@ -15,11 +15,9 @@
 
 <div class="bg-white rounded-xl shadow-xl border border-gray-100 p-8 md:p-10 w-11/12 mx-auto -mt-16 relative">
 
-    <form action="{{ route('customer.profile.update') }}" method="POST" class="space-y-6">
+    <form action="{{ route('customer.profile.update') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
         @csrf
         
-        <h2 class="text-xl font-bold text-gray-800 border-b pb-3">Personal Information</h2>
-
         {{-- Display general validation errors (for THIS form only) --}}
         @if ($errors->default->any())
             <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
@@ -31,6 +29,36 @@
                 </ul>
             </div>
         @endif
+
+        {{-- =============================================== --}}
+        {{-- NEW: Profile Picture Upload --}}
+        {{-- =============================================== --}}
+        <div class="flex items-center gap-6 mb-8 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+            <div class="flex-shrink-0">
+                @if($customer->customer_Image)
+                    <img src="{{ asset('storage/' . $customer->customer_Image) }}" class="w-20 h-20 rounded-full object-cover border-2 border-white shadow-md">
+                @else
+                    <div class="w-20 h-20 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-600 text-3xl font-bold">
+                        {{ substr($customer->customer_FullName, 0, 1) }}
+                    </div>
+                @endif
+            </div>
+            <div class="flex-grow">
+                <label class="block text-sm font-bold text-indigo-900 mb-1">Profile Photo</label>
+                <input type="file" name="customer_Image" accept="image/*"
+                       class="block w-full text-sm text-slate-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-indigo-600 file:text-white
+                              hover:file:bg-indigo-700
+                              cursor-pointer">
+                <p class="text-xs text-gray-500 mt-1">JPG, PNG or GIF. Max 2MB.</p>
+            </div>
+        </div>
+        {{-- =============================================== --}}
+
+        <h2 class="text-xl font-bold text-gray-800 border-b pb-3">Personal Information</h2>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

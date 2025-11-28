@@ -365,11 +365,12 @@ public function update(Request $request, $adsID)
         }
 
         // 5. Fetch user's existing applications (This is unchanged)
+        // 5. Fetch user's existing applications
         $applications = Applications::where('customerID', $customer->customerID)
-            ->whereHas('advertisement', fn($q) => $q->where('ads_SlotTime', '>', $currentTime))
-            ->with('advertisement')
-            ->orderByDesc('created_at')
-            ->get();
+        ->whereHas('advertisement', fn($q) => $q->where('ads_SlotTime', '>', $currentTime))
+        ->with('advertisement.customer') // <-- Fetch the ad owner's details
+        ->orderByDesc('created_at')
+        ->get();
         
         foreach ($applications as $application) {
             if ($application->advertisement) {

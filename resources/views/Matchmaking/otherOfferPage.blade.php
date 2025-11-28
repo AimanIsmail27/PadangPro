@@ -20,8 +20,8 @@
                     Showing the best matches for your profile first.
                 </p>
             </div>
-            <div class="flex gap-3">
-                {{-- Buttons are now dynamically styled based on the $view variable --}}
+            {{-- View toggle buttons - hidden on mobile --}}
+            <div class="hidden md:flex gap-3">
                 <button id="tableViewBtn" class="px-4 py-2 rounded-lg shadow text-sm font-medium {{ $view === 'table' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}">Table View</button>
                 <button id="cardViewBtn" class="px-4 py-2 rounded-lg shadow text-sm font-medium {{ $view === 'card' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}">Card View</button>
             </div>
@@ -30,7 +30,8 @@
         @if($ads->isEmpty())
             <p class="text-gray-500 italic text-center py-12 text-lg">🚀 No matchmaking ads available right now.</p>
         @else
-            <div id="cardView" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 {{ $view === 'card' ? '' : 'hidden' }}">
+            {{-- Card View - Always visible on mobile, toggleable on desktop --}}
+            <div id="cardView" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 {{ $view === 'card' ? '' : 'md:hidden' }}">
                 @foreach($ads as $ad)
                     <div class="bg-white border rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all relative overflow-hidden">
                         @php
@@ -43,9 +44,7 @@
                             <i class="bi {{$scoreIcon}}"></i>
                             <span>{{ $score }}% Match</span>
                         </div>
-                        
                         <h3 class="text-lg font-bold text-gray-800 mb-3 mt-4">{{ $ad->ads_Name }}</h3>
-                        
                         <div class="space-y-2 text-sm text-gray-600 mb-4">
                             <p class="flex items-center gap-2"><i class="bi bi-person-badge text-indigo-600 w-4"></i> <span class="font-semibold">Type:</span> 
                                 <span class="font-medium @if($ad->ads_Type === 'Additional Player') text-blue-700 @else text-purple-700 @endif">{{ $ad->ads_Type }}</span>
@@ -65,7 +64,6 @@
                                 </span>
                             </p>
                         </div>
-
                         <div class="flex justify-between items-center mt-4 pt-4 border-t">
                             @if($ad->ads_Status === 'Active')
                                 <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">Active</span>
@@ -86,44 +84,45 @@
                 @endforeach
             </div>
 
-            <div id="tableView" class="overflow-x-auto {{ $view === 'table' ? '' : 'hidden' }}">
+            {{-- Table View - Hidden on mobile, toggleable on desktop --}}
+            <div id="tableView" class="hidden md:block overflow-x-auto {{ $view === 'table' ? '' : 'md:hidden' }}">
                 <table class="w-full border-collapse overflow-hidden rounded-xl shadow">
                     <thead class="bg-slate-50">
-                        <tr class="text-slate-600 text-sm uppercase tracking-wide">
-                            <th class="p-4 text-left">Match Score</th>
-                            <th class="p-4 text-left">Ad Title</th>
-                            <th class="p-4 text-left">Type</th>
-                            <th class="p-4 text-left">Slot Time</th>
-                            <th class="p-4 text-left">Status</th>
-                            <th class="p-4 text-center">Actions</th>
+                        <tr class="text-slate-600 text-xs md:text-sm uppercase tracking-wide">
+                            <th class="p-2 md:p-4 text-left">Match Score</th>
+                            <th class="p-2 md:p-4 text-left">Ad Title</th>
+                            <th class="p-2 md:p-4 text-left">Type</th>
+                            <th class="p-2 md:p-4 text-left">Slot Time</th>
+                            <th class="p-2 md:p-4 text-left">Status</th>
+                            <th class="p-2 md:p-4 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
                         @foreach($ads as $ad)
                             <tr class="hover:bg-slate-50 transition">
-                                <td class="p-4 text-center">
+                                <td class="p-2 md:p-4 text-center">
                                     @php $score = round($ad->compatibility_score ?? 0); @endphp
-                                    <span class="font-bold text-xl 
-                                        @if($score > 70) text-green-600
-                                        @elseif($score > 40) text-yellow-600
-                                        @else text-red-600 @endif" title="Based on your profile">
-                                        {{ $score }}%
+                                    <span class="font-bold text-lg md:text-xl 
+                                    @if($score > 70) text-green-600
+                                    @elseif($score > 40) text-yellow-600
+                                    @else text-red-600 @endif" title="Based on your profile">
+                                    {{ $score }}%
                                     </span>
                                 </td>
-                                <td class="p-4 font-semibold text-gray-800">{{ $ad->ads_Name }}</td>
-                                <td class="p-4 font-medium @if($ad->ads_Type === 'Additional Player') text-blue-700 @else text-purple-700 @endif">{{ $ad->ads_Type }}</td>
-                                <td class="p-4 text-gray-700">{{ \Carbon\Carbon::parse($ad->ads_SlotTime)->format('l, d M Y | h:i A') }}</td>
-                                <td class="p-4">
-                                    @if($ad->ads_Status === 'Active') <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">Active</span>
-                                    @elseif($ad->ads_Status === 'Filled') <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">Filled</span>
-                                    @else <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-semibold">{{ $ad->ads_Status }}</span>
+                                <td class="p-2 md:p-4 font-semibold text-gray-800 text-xs md:text-base">{{ $ad->ads_Name }}</td>
+                                <td class="p-2 md:p-4 font-medium text-xs md:text-base @if($ad->ads_Type === 'Additional Player') text-blue-700 @else text-purple-700 @endif">{{ $ad->ads_Type }}</td>
+                                <td class="p-2 md:p-4 text-gray-700 text-xs md:text-base">{{ \Carbon\Carbon::parse($ad->ads_SlotTime)->format('l, d M Y | h:i A') }}</td>
+                                <td class="p-2 md:p-4">
+                                    @if($ad->ads_Status === 'Active') <span class="bg-green-100 text-green-700 px-2 md:px-3 py-1 rounded-full text-xs font-semibold">Active</span>
+                                    @elseif($ad->ads_Status === 'Filled') <span class="bg-red-100 text-red-700 px-2 md:px-3 py-1 rounded-full text-xs font-semibold">Filled</span>
+                                    @else <span class="bg-gray-100 text-gray-700 px-2 md:px-3 py-1 rounded-full text-xs font-semibold">{{ $ad->ads_Status }}</span>
                                     @endif
                                 </td>
-                                <td class="p-4 text-center">
+                                <td class="p-2 md:p-4 text-center">
                                     @if($ad->ads_Status === 'Filled')
                                         <span class="text-gray-500 text-sm italic">Filled</span>
                                     @else
-                                        <a href="{{ route('matchmaking.joinForm', $ad->adsID) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm shadow-md">
+                                        <a href="{{ route('matchmaking.joinForm', $ad->adsID) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm shadow-md whitespace-nowrap inline-block">
                                             View & Join
                                         </a>
                                     @endif
@@ -135,10 +134,8 @@
             </div>
 
             <div class="mt-8">
-                {{-- This will now correctly append ?view=table or ?view=card to the pagination links --}}
                 {{ $ads->links() }}
             </div>
-            
         @endif
     </div>
 
@@ -148,7 +145,11 @@
         @if($applications->isEmpty())
             <p class="text-gray-500 italic text-center py-12 text-lg">📌 You have not applied to any ads yet.</p>
         @else
-            <div id="myRequestsCardView" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 {{ $view === 'card' ? '' : 'hidden' }}">
+            
+            {{-- =============================================== --}}
+            {{-- MY REQUESTS - CARD VIEW (Always visible on mobile) --}}
+            {{-- =============================================== --}}
+            <div id="myRequestsCardView" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 {{ $view === 'card' ? '' : 'md:hidden' }}">
                 @foreach($applications as $app)
                     @if($app->advertisement)
                         <div class="bg-white border rounded-xl shadow-lg p-6">
@@ -162,6 +163,7 @@
                                 @else <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">Filled</span>
                                 @endif
                             </div>
+                            
                             <div class="flex justify-between items-center mt-2">
                                 <span class="text-sm font-semibold text-gray-600">My Status:</span>
                                 <span class="px-3 py-1 rounded-full text-xs font-semibold
@@ -171,37 +173,83 @@
                                     {{ ucfirst($app->status) }}
                                 </span>
                             </div>
+
+                            {{-- =============================================== --}}
+                            {{-- Contact Button (Only if Approved) --}}
+                            {{-- =============================================== --}}
+                            @if(strtolower($app->status) === 'approved' && $app->advertisement->customer)
+                                @php
+                                    $rawPhone = $app->advertisement->customer->customer_PhoneNumber;
+                                    $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone); // Remove non-numeric chars
+                                    if (substr($cleanPhone, 0, 1) === '0') {
+                                        $cleanPhone = '6' . $cleanPhone; // Convert 01... to 601...
+                                    }
+                                @endphp
+                                <div class="mt-4 pt-4 border-t text-center">
+                                    <a href="https://wa.me/{{ $cleanPhone }}?text=Hi, I matched with your ad '{{ $app->advertisement->ads_Name }}' on PadangPro!" 
+                                       target="_blank"
+                                       class="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md text-sm font-bold w-full justify-center transition-all">
+                                        <i class="bi bi-whatsapp"></i> Contact Organizer
+                                    </a>
+                                </div>
+                            @endif
                         </div>
                     @endif
                 @endforeach
             </div>
 
-            <div id="myRequestsTableView" class="overflow-x-auto {{ $view === 'table' ? '' : 'hidden' }}">
+            {{-- =============================================== --}}
+            {{-- MY REQUESTS - TABLE VIEW (Hidden on mobile) --}}
+            {{-- =============================================== --}}
+            <div id="myRequestsTableView" class="hidden md:block overflow-x-auto {{ $view === 'table' ? '' : 'md:hidden' }}">
                 <table class="w-full border-collapse overflow-hidden rounded-xl shadow">
                     <thead class="bg-slate-50">
-                        <tr class="text-slate-600 text-sm uppercase tracking-wide">
-                            <th class="p-4 text-left">Ad Title</th>
-                            <th class="p-4 text-left">Type</th>
-                            <th class="p-4 text-left">Slot Time</th>
-                            <th class="p-4 text-left">Ad Status</th>
-                            <th class="p-4 text-left">My Request Status</th>
+                        <tr class="text-slate-600 text-xs md:text-sm uppercase tracking-wide">
+                            <th class="p-2 md:p-4 text-left">Ad Title</th>
+                            <th class="p-2 md:p-4 text-left">Type</th>
+                            <th class="p-2 md:p-4 text-left">Slot Time</th>
+                            <th class="p-2 md:p-4 text-left">Ad Status</th>
+                            <th class="p-2 md:p-4 text-left">My Request Status</th>
+                            <th class="p-2 md:p-4 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
                         @foreach($applications as $app)
                             @if($app->advertisement)
                                 <tr class="hover:bg-slate-50 transition">
-                                    <td class="p-4 font-semibold text-gray-800">{{ $app->advertisement->ads_Name }}</td>
-                                    <td class="p-4 text-gray-600">{{ $app->advertisement->ads_Type }}</td>
-                                    <td class="p-4 text-gray-600">{{ \Carbon\Carbon::parse($app->advertisement->ads_SlotTime)->format('l, d M Y | h:i A') }}</td>
-                                    <td class="p-4 text-gray-600">{{ $app->advertisement->ads_Status ?? 'Open' }}</td>
-                                    <td class="p-4">
-                                        <span class="px-3 py-1 rounded-full text-xs font-semibold
+                                    <td class="p-2 md:p-4 font-semibold text-gray-800 text-xs md:text-base">{{ $app->advertisement->ads_Name }}</td>
+                                    <td class="p-2 md:p-4 text-gray-600 text-xs md:text-base">{{ $app->advertisement->ads_Type }}</td>
+                                    <td class="p-2 md:p-4 text-gray-600 text-xs md:text-base">{{ \Carbon\Carbon::parse($app->advertisement->ads_SlotTime)->format('l, d M Y | h:i A') }}</td>
+                                    <td class="p-2 md:p-4 text-gray-600 text-xs md:text-base">{{ $app->advertisement->ads_Status ?? 'Open' }}</td>
+                                    <td class="p-2 md:p-4">
+                                        <span class="px-2 md:px-3 py-1 rounded-full text-xs font-semibold
                                             @if(strtolower($app->status) === 'approved') bg-green-100 text-green-700
                                             @elseif(strtolower($app->status) === 'rejected') bg-red-100 text-red-700
                                             @else bg-yellow-100 text-yellow-700 @endif">
                                             {{ ucfirst($app->status) }}
                                         </span>
+                                    </td>
+                                    <td class="p-2 md:p-4 text-center">
+                                        {{-- =============================================== --}}
+                                        {{-- WhatsApp Action (Table View) --}}
+                                        {{-- =============================================== --}}
+                                        @if(strtolower($app->status) === 'approved' && $app->advertisement->customer)
+                                            @php
+                                                $rawPhone = $app->advertisement->customer->customer_PhoneNumber;
+                                                $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone);
+                                                if (substr($cleanPhone, 0, 1) === '0') {
+                                                    $cleanPhone = '6' . $cleanPhone;
+                                                }
+                                            @endphp
+                                            <a href="https://wa.me/{{ $cleanPhone }}?text=Hi, I matched with your ad '{{ $app->advertisement->ads_Name }}' on PadangPro!" 
+                                               target="_blank"
+                                               class="text-green-600 hover:text-green-800 font-bold text-xl md:text-2xl transition-transform hover:scale-110 inline-block"
+                                               title="Contact Organizer on WhatsApp">
+                                                <i class="bi bi-whatsapp"></i>
+                                            </a>
+                                        @else
+                                            <span class="text-gray-300">-</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @endif
@@ -214,7 +262,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
-    {{-- NEW: UPDATED JAVASCRIPT --}}
     <script>
         const tableViewBtn = document.getElementById('tableViewBtn');
         const cardViewBtn = document.getElementById('cardViewBtn');
@@ -232,21 +279,21 @@
             window.location.href = url.toString();
         }
 
-        tableViewBtn.addEventListener('click', () => {
-            // Only reload if the view is not already 'table'
-            if ('{{ $view }}' !== 'table') {
-                setView('table');
-            }
-        });
+        // Only add event listeners if buttons exist (desktop view)
+        if (tableViewBtn && cardViewBtn) {
+            tableViewBtn.addEventListener('click', () => {
+                if ('{{ $view }}' !== 'table') {
+                    setView('table');
+                }
+            });
 
-        cardViewBtn.addEventListener('click', () => {
-            // Only reload if the view is not already 'card'
-            if ('{{ $view }}' !== 'card') {
-                setView('card');
-            }
-        });
+            cardViewBtn.addEventListener('click', () => {
+                if ('{{ $view }}' !== 'card') {
+                    setView('card');
+                }
+            });
+        }
 
-        // Show full description popup (unchanged)
         function showFullDescription(text) {
             Swal.fire({
                 title: 'Full Description',

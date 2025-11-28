@@ -9,6 +9,9 @@ use App\Models\Customer;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeMail;
+
 
 class GoogleController extends Controller
 {
@@ -55,6 +58,8 @@ class GoogleController extends Controller
                 ]);
 
                 Log::info('Customer created with ID: ' . $customerID);
+                Mail::to($googleUser->getEmail())->send(new WelcomeMail($googleUser->getName() ?? 'Google User'));
+
             }
 
             DB::commit();

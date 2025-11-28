@@ -14,13 +14,18 @@
 </div>
 
 <div class="bg-white rounded-xl shadow-md border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-16 relative">
+
     @if($savedReports->isEmpty())
         <div class="text-center py-10 px-6 bg-gray-50 rounded-lg">
             <i class="bi bi-file-earmark-bar-graph text-4xl text-gray-400"></i>
             <p class="mt-4 text-gray-500">No reports have been published yet.</p>
         </div>
     @else
-        <div class="overflow-x-auto">
+
+        {{-- =============================  
+             DESKTOP TABLE VIEW (≥640px)
+        ============================== --}}
+        <div class="hidden sm:block overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
@@ -30,30 +35,72 @@
                         <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
+
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($savedReports as $report)
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            {{-- FIX 1: Text wrapping enabled and width set --}}
-                            <td class="px-6 py-4 whitespace-normal text-sm font-medium text-gray-900">{{ $report->report_Title }}</td>
-                            
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ucwords(str_replace('_', ' ', $report->report_type)) }}</td>
-                            
-                            {{-- FIX 2: Using the correct full_name accessor --}}
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $report->publisher->full_name ?? 'Unknown' }}</td>
-                            
-                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                <a href="{{ route('admin.reports.show', array_merge(['report_type' => $report->report_type, 'view_only' => 'true'], (array) $report->parameters)) }}" class="text-indigo-600 hover:text-indigo-900">
-                                    View Report
-                                </a>
-                            </td>
-                        </tr>
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-normal text-sm font-medium text-gray-900">
+                            {{ $report->report_Title }}
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ ucwords(str_replace('_', ' ', $report->report_type)) }}
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ $report->publisher->full_name ?? 'Unknown' }}
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                            <a href="{{ route('admin.reports.show', array_merge(['report_type' => $report->report_type, 'view_only' => 'true'], (array)$report->parameters)) }}"
+                               class="text-indigo-600 hover:text-indigo-900">
+                                View Report
+                            </a>
+                        </td>
+                    </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
+
+        {{-- =============================  
+                MOBILE CARD VIEW (<640px)
+        ============================== --}}
+        <div class="sm:hidden space-y-4 mt-4">
+            @foreach($savedReports as $report)
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm">
+
+                <p class="text-xs text-gray-500 uppercase">Report Name</p>
+                <p class="font-bold text-gray-900 mb-2">
+                    {{ $report->report_Title }}
+                </p>
+
+                <p class="text-xs text-gray-500 uppercase">Report Type</p>
+                <p class="text-gray-800 mb-2">
+                    {{ ucwords(str_replace('_', ' ', $report->report_type)) }}
+                </p>
+
+                <p class="text-xs text-gray-500 uppercase">Published By</p>
+                <p class="text-gray-800 mb-4">
+                    {{ $report->publisher->full_name ?? 'Unknown' }}
+                </p>
+
+                <div class="text-right">
+                    <a href="{{ route('admin.reports.show', array_merge(['report_type' => $report->report_type, 'view_only' => 'true'], (array)$report->parameters)) }}"
+                       class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-semibold shadow hover:bg-indigo-700 transition">
+                       View Report
+                    </a>
+                </div>
+
+            </div>
+            @endforeach
+        </div>
+
+        {{-- Pagination --}}
         <div class="mt-6">
             {{ $savedReports->links() }}
         </div>
+
     @endif
 </div>
 @endsection

@@ -8,78 +8,149 @@
 
 @section('content')
 
-<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 text-white pt-8 pb-32 px-10 rounded-lg shadow-lg">
+{{-- HEADER --}}
+<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 text-white pt-10 pb-28 px-6 sm:px-10 rounded-lg shadow-lg">
     <h1 class="text-3xl font-bold">Reports Dashboard</h1>
-   
 </div>
 
-<div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-24 relative space-y-12">
+{{-- MAIN CONTAINER --}}
+<div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-5 sm:p-8 w-11/12 mx-auto -mt-24 relative space-y-12">
 
+    {{-- KPI SECTION --}}
     <div>
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">This Month's Performance ({{ \Carbon\Carbon::now('Asia/Kuala_Lumpur')->format('F Y') }})</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Booking Revenue</p><p class="text-4xl font-bold text-gray-800 mt-2">RM {{ number_format($kpi_revenue, 0) }}</p></div><div class="p-4 rounded-full bg-green-100 text-green-600"><i class="bi bi-cash-stack text-3xl"></i></div></div></div>
-            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Bookings</p><p class="text-4xl font-bold text-gray-800 mt-2">{{ $kpi_bookings }}</p></div><div class="p-4 rounded-full bg-blue-100 text-blue-600"><i class="bi bi-calendar2-check text-3xl"></i></div></div></div>
-            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-teal-500"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Rental Revenue</p><p class="text-4xl font-bold text-gray-800 mt-2">RM {{ number_format($kpi_rental_revenue, 0) }}</p></div><div class="p-4 rounded-full bg-teal-100 text-teal-600"><i class="bi bi-receipt text-3xl"></i></div></div></div>
-            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-indigo-500"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Items Rented</p><p class="text-4xl font-bold text-gray-800 mt-2">{{ $kpi_items_rented }}</p></div><div class="p-4 rounded-full bg-indigo-100 text-indigo-600"><i class="bi bi-tags-fill text-3xl"></i></div></div></div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">
+            This Month's Performance ({{ \Carbon\Carbon::now('Asia/Kuala_Lumpur')->format('F Y') }})
+        </h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {{-- KPI Card 1 --}}
+            <div class="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 uppercase">Booking Revenue</p>
+                        <p class="text-3xl sm:text-4xl font-bold text-gray-800 mt-2">
+                            RM {{ number_format($kpi_revenue, 0) }}
+                        </p>
+                    </div>
+                    <div class="p-4 rounded-full bg-green-100 text-green-600">
+                        <i class="bi bi-cash-stack text-2xl sm:text-3xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            {{-- KPI Card 2 --}}
+            <div class="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 uppercase">Total Bookings</p>
+                        <p class="text-3xl sm:text-4xl font-bold text-gray-800 mt-2">{{ $kpi_bookings }}</p>
+                    </div>
+                    <div class="p-4 rounded-full bg-blue-100 text-blue-600">
+                        <i class="bi bi-calendar2-check text-2xl sm:text-3xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            {{-- KPI Card 3 --}}
+            <div class="bg-white rounded-xl shadow-lg p-5 border-l-4 border-teal-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 uppercase">Rental Revenue</p>
+                        <p class="text-3xl sm:text-4xl font-bold text-gray-800 mt-2">
+                            RM {{ number_format($kpi_rental_revenue, 0) }}
+                        </p>
+                    </div>
+                    <div class="p-4 rounded-full bg-teal-100 text-teal-600">
+                        <i class="bi bi-receipt text-2xl sm:text-3xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            {{-- KPI Card 4 --}}
+            <div class="bg-white rounded-xl shadow-lg p-5 border-l-4 border-indigo-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 uppercase">Items Rented</p>
+                        <p class="text-3xl sm:text-4xl font-bold text-gray-800 mt-2">{{ $kpi_items_rented }}</p>
+                    </div>
+                    <div class="p-4 rounded-full bg-indigo-100 text-indigo-600">
+                        <i class="bi bi-tags-fill text-2xl sm:text-3xl"></i>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
+    {{-- AUTOMATED REPORTS --}}
     <div>
-        <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
             <h2 class="text-2xl font-bold text-gray-800">Automated Reports</h2>
-            <a href="{{ route('admin.reports.create') }}" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
+            <a href="{{ route('admin.reports.create') }}"
+               class="w-full sm:w-auto text-center bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
                 Generate New Report
             </a>
         </div>
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {{-- Monthly Revenue Chart --}}
             <div>
                 <h3 class="text-lg font-semibold text-gray-700 mb-2">Last 6 Months Booking Revenue</h3>
-                <div class="bg-gray-50/70 p-4 rounded-lg border h-[400px]">
+                <div class="bg-gray-50 p-4 rounded-lg border h-[350px] sm:h-[400px]">
                     <canvas id="monthlyRevenueChart"></canvas>
                 </div>
             </div>
+
+            {{-- Top Rented Items --}}
             <div>
                 <h3 class="text-lg font-semibold text-gray-700 mb-2">Top Rented Items (Last 90 Days)</h3>
-                <div class="bg-gray-50/70 p-4 rounded-lg border h-[400px]">
+                <div class="bg-gray-50 p-4 rounded-lg border h-[350px] sm:h-[400px]">
                     <canvas id="topItemsChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
-    
+
+    {{-- AI FORECAST --}}
     <div class="pt-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-4">
             <i class="bi bi-robot text-amber-500"></i> AI Generated: Next 7-Day Booking Demand Forecast
         </h2>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 bg-gray-50/70 p-4 rounded-lg border h-[400px]">
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {{-- Chart --}}
+            <div class="lg:col-span-2 bg-gray-50 p-4 rounded-lg border h-[350px] sm:h-[400px]">
                 <canvas id="forecastChart"></canvas>
             </div>
 
-            <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg border">
-                <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Key Insights</h3>
-                <div class="space-y-4 text-sm">
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 flex items-center"><i class="bi bi-calendar-week mr-2"></i>Total Forecast (7 days):</span>
-                        <span id="forecast-total" class="font-bold text-gray-900 text-base">Calculating...</span>
+            {{-- Insights --}}
+            <div class="lg:col-span-1 bg-gray-50 p-5 rounded-lg border space-y-4">
+                <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Key Insights</h3>
+
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600"><i class="bi bi-calendar-week mr-1"></i>Total Forecast (7 days):</span>
+                        <span id="forecast-total" class="font-bold text-gray-900">...</span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 flex items-center"><i class="bi bi-graph-up-arrow text-green-600 mr-2"></i>Predicted Busiest Day:</span>
-                        <span id="forecast-peak" class="font-bold text-green-600">Calculating...</span>
+
+                    <div class="flex justify-between">
+                        <span class="text-gray-600"><i class="bi bi-graph-up-arrow text-green-600 mr-1"></i>Busiest Day:</span>
+                        <span id="forecast-peak" class="font-bold text-green-600">...</span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 flex items-center"><i class="bi bi-graph-down-arrow text-red-600 mr-2"></i>Predicted Quietest Day:</span>
-                        <span id="forecast-low" class="font-bold text-red-600">Calculating...</span>
+
+                    <div class="flex justify-between">
+                        <span class="text-gray-600"><i class="bi bi-graph-down-arrow text-red-600 mr-1"></i>Quietest Day:</span>
+                        <span id="forecast-low" class="font-bold text-red-600">...</span>
                     </div>
                 </div>
 
-                <h3 class="text-lg font-bold text-gray-800 mt-6 mb-4 border-b pb-2">AI Recommendation</h3>
-                <div id="forecast-recommendation" class="text-sm text-gray-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+                <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mt-4">AI Recommendation</h3>
+                <div id="forecast-recommendation"
+                     class="text-sm text-gray-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
                     <p>Analyzing trends...</p>
                 </div>
             </div>
+
         </div>
     </div>
 

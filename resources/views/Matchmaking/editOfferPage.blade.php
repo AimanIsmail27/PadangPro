@@ -2,11 +2,14 @@
 
 @section('title', 'Edit Matchmaking Advertisement')
 
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+@endpush
+
 @section('content')
-    <div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white rounded-lg h-[120px] relative shadow-md mb-8 flex items-center">
-        <div class="text-white font-bold text-2xl px-8">
-            Edit Matchmaking Advertisement
-        </div>
+    <div class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white pt-8 pb-24 px-10 rounded-lg shadow-2xl">
+        <h1 class="text-3xl font-bold">Edit Matchmaking Advertisement</h1>
+        <p class="mt-2 text-indigo-100">Update the details of your ad.</p>
     </div>
 
 <div class="bg-white shadow-2xl rounded-3xl p-10 max-w-4xl mx-auto space-y-8">
@@ -16,11 +19,10 @@
         </div>
     @endif
 
-    {{-- NEW: THIS BLOCK WILL DISPLAY ALL VALIDATION ERRORS --}}
+    {{-- Validation Errors --}}
     @if ($errors->any())
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
             <strong class="font-bold">Error!</strong>
-            <span class="block sm:inline">Please fix the following issues:</span>
             <ul class="mt-3 list-disc list-inside text-sm">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -28,10 +30,11 @@
             </ul>
         </div>
     @endif
+    {{-- END Validation Errors --}}
 
     <form action="{{ route('matchmaking.update', $ad->adsID) }}" method="POST" class="space-y-6">
         @csrf
-
+        
         <div>
             <label for="ads_Name" class="block text-gray-700 font-semibold mb-2">Ad Title <span class="text-red-500">*</span></label>
             <input type="text" id="ads_Name" name="ads_Name" 
@@ -99,6 +102,12 @@
                     @php
                         $positions = ['GK','RB','LB','CB','CDM','CM','CAM','RM','LM','ST','CF'];
                         $selectedPositions = old('ads_RequiredPosition', $ad->ads_RequiredPosition ?? []);
+                        // Ensure selectedPositions is an array for in_array check
+                        if (!is_array($selectedPositions) && is_string($selectedPositions)) {
+                            $selectedPositions = json_decode($selectedPositions, true) ?? [];
+                        } elseif (!is_array($selectedPositions)) {
+                            $selectedPositions = [];
+                        }
                     @endphp
                     <div class="grid grid-cols-3 md:grid-cols-4 gap-3 p-4 border border-gray-200 rounded-2xl bg-gray-50">
                         @foreach($positions as $pos)
@@ -129,12 +138,77 @@
                       placeholder="Provide details about your ad...">{{ old('ads_Description', $ad->ads_Description) }}</textarea>
         </div>
 
-        <div class="flex justify-end pt-4 border-t">
+        {{-- Responsive Button Group --}}
+        <div class="flex flex-col-reverse md:flex-row justify-end gap-3 pt-4 border-t">
+            
+            {{-- Cancel Button (W-FULL on mobile) --}}
+            <a href="{{ route('matchmaking.personal') }}"
+               class="w-full md:w-auto text-center px-8 py-3 rounded-xl shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition font-semibold text-lg">
+                Cancel
+            </a>
+
+            {{-- Submit Button (W-FULL on mobile) --}}
             <button type="submit"
-                    class="bg-gradient-to-r from-indigo-600 to-slate-800 text-white px-8 py-3 rounded-xl shadow-lg hover:opacity-90 transition font-semibold text-lg">
+                    class="w-full md:w-auto bg-gradient-to-r from-indigo-600 to-slate-800 text-white px-8 py-3 rounded-xl shadow-lg hover:opacity-90 transition font-semibold text-lg">
                 Update Advertisement
             </button>
         </div>
     </form>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    const adsTypeSelect = {
+        value: '{{ $ad->ads_Type }}', // Simulate select element for initial check
+        addEventListener: () => {} // Dummy addEventListener since we don't change type on edit
+    };
+    const aiMatchingFields = document.getElementById('aiMatchingFields');
+    const additionalPlayerFields = document.getElementById('additionalPlayerFields');
+
+    // Initial run to ensure fields are displayed/hidden correctly based on $ad->ads_Type
+    // Note: Since ads_Type is readonly on this page, we only need to set the display once.
+    if ('{{ $ad->ads_Type }}' === 'Additional Player' || '{{ $ad->ads_Type }}' === 'Opponent Search') {
+        if (aiMatchingFields) {
+            aiMatchingFields.style.display = 'block';
+        }
+        if ('{{ $ad->ads_Type }}' === 'Additional Player' && additionalPlayerFields) {
+            additionalPlayerFields.style.display = 'block';
+        }
+    }
+    
+    // (Existing SweetAlert scripts remain)
+    @if(session('success'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            Swal.fire({
+                title: 'Success!',
+                text: "{{ session('success') }}",
+                icon: 'success',
+                confirmButtonColor: '#4f46e5',
+                confirmButtonText: 'OK'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Redirect to the main ads page after success
+                    window.location.href = "{{ route('matchmaking.personal') }}";
+                }
+            });
+        });
+    </script>
+    @endif
+    
+    @if ($errors->password->any())
+    <script>
+        // Placeholder for password errors, though not on this form
+        document.addEventListener('DOMContentLoaded', function() {
+             Swal.fire({
+                title: 'Password Change Failed',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+            });
+        });
+    </script>
+    @endif
+</script>
+@endpush

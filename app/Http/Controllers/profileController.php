@@ -17,6 +17,7 @@ use App\Models\Rental;
 use App\Models\Applications;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 
 class ProfileController extends Controller
@@ -25,45 +26,48 @@ class ProfileController extends Controller
  * Show the customer profile page.
  */
 public function showCustomerProfile(Request $request)
-{
-    $userId = session('user_id');
+    {
+        $userId = session('user_id');
 
-    $user = User::where('userID', $userId)->first();
-    $customer = Customer::where('userID', $userId)->first();
+        $user = User::where('userID', $userId)->first();
+        $customer = Customer::where('userID', $userId)->first();
 
-    if (!$user || !$customer) {
-        return redirect()->route('customer.dashboard')->with('error', 'Profile not found.');
-    }
+        if (!$user || !$customer) {
+            return redirect()->route('customer.dashboard')->with('error', 'Profile not found.');
+        }
 
-    // Decode availability JSON
-    $availabilityDays = 'Not set';
-    $availabilityTimes = 'Not set';
+        // Decode availability JSON
+        $availabilityDays = 'Not set';
+        $availabilityTimes = 'Not set';
 
-    if (!empty($customer->customer_Availability)) {
-        $decoded = json_decode($customer->customer_Availability, true);
+        if (!empty($customer->customer_Availability)) {
+            $decoded = json_decode($customer->customer_Availability, true);
 
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            if (!empty($decoded['days'])) {
-                $availabilityDays = implode(', ', $decoded['days']);
-            }
-            if (!empty($decoded['time'])) {
-                $availabilityTimes = implode(', ', $decoded['time']);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                if (!empty($decoded['days'])) {
+                    $availabilityDays = implode(', ', $decoded['days']);
+                }
+                if (!empty($decoded['time'])) {
+                    $availabilityTimes = implode(', ', $decoded['time']);
+                }
             }
         }
-    }
 
-    return view('Profile.customer.MainProfilePage', [
-        'fullName'         => $customer->customer_FullName,
-        'email'            => $user->user_Email,
-        'phoneNumber'      => $customer->customer_PhoneNumber,
-        'age'              => $customer->customer_Age,
-        'address'          => $customer->customer_Address,
-        'position'         => $customer->customer_Position ?? 'Not set',
-        'skillLevel'       => $customer->customer_SkillLevel ?? 'Not set',
-        'availabilityDays' => $availabilityDays,
-        'availabilityTimes'=> $availabilityTimes,
-    ]);
-}
+        return view('Profile.customer.MainProfilePage', [
+            // --- THIS IS THE FIX: Pass the full object ---
+            'customer'          => $customer, 
+            // --------------------------------------------
+            'fullName'          => $customer->customer_FullName,
+            'email'             => $user->user_Email,
+            'phoneNumber'       => $customer->customer_PhoneNumber,
+            'age'               => $customer->customer_Age,
+            'address'           => $customer->customer_Address,
+            'position'          => $customer->customer_Position ?? 'Not set',
+            'skillLevel'        => $customer->customer_SkillLevel ?? 'Not set',
+            'availabilityDays'  => $availabilityDays,
+            'availabilityTimes' => $availabilityTimes,
+        ]);
+    }
 
 /**
  * Show edit profile page.
@@ -85,58 +89,65 @@ public function edit()
 /**
  * Update customer profile.
  */
-public function update(Request $request)
-{
-    $userId = session('user_id');
-    $user = User::where('userID', $userId)->first();
-    $customer = Customer::where('userID', $userId)->first();
+// Update customer profile
+    public function update(Request $request)
+    {
+        $userId = session('user_id');
+        $customer = Customer::where('userID', $userId)->first();
+        $user = User::where('userID', $userId)->first();
 
-    if (!$user || !$customer) {
-        return redirect()->route('customer.profile')->with('error', 'Profile not found.');
-    }
-
-    // Validate input
-    $request->validate([
-        'customer_FullName'            => 'required|string|max:255',
-        'user_Email'                   => 'required|email',
-        'customer_PhoneNumber'         => 'required|string|max:20',
-        'customer_Age'                 => 'required|integer|min:1|max:120',
-        'customer_Address'             => 'required|string|max:255',
-        'customer_Position'            => 'required|string|max:50',
-        'customer_SkillLevel'          => 'nullable|integer|min:1|max:5',
-        'customer_Availability_days'   => 'nullable|array',
-        'customer_Availability_days.*' => 'string',
-        'customer_Availability_times'  => 'nullable|array',
-        'customer_Availability_times.*'=> 'string',
-    ]);
-
-    // Update user email
-    $user->update([
-        'user_Email' => $request->user_Email,
-    ]);
-
-    // Build availability JSON
-    $availability = null;
-    if ($request->has('customer_Availability_days') || $request->has('customer_Availability_times')) {
-        $availability = json_encode([
-            'days' => $request->input('customer_Availability_days', []),
-            'time' => $request->input('customer_Availability_times', []),
+        // 1. Validate
+        $request->validate([
+            'customer_FullName' => 'required|string|max:50',
+            'user_Email' => 'required|email|max:50|unique:user,user_Email,' . $userId . ',userID',
+            'customer_PhoneNumber' => 'required|string|max:20',
+            'customer_Age' => 'required|integer|min:18|max:100',
+            'customer_Address' => 'required|string|max:255',
+            'customer_Position' => 'required|string',
+            'customer_SkillLevel' => 'required|integer|between:1,5',
+            'customer_Availability_days' => 'array',
+            'customer_Availability_times' => 'array',
+            'customer_Image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // NEW: Image validation
         ]);
+
+        // 2. Prepare JSON availability
+        $availability = json_encode([
+            'days' => $request->customer_Availability_days ?? [],
+            'time' => $request->customer_Availability_times ?? [],
+        ]);
+
+        // 3. Update User Table (Email)
+        $user->user_Email = $request->user_Email;
+        $user->save();
+
+        // 4. Update Customer Table
+        $customer->customer_FullName = $request->customer_FullName;
+        $customer->customer_PhoneNumber = $request->customer_PhoneNumber;
+        $customer->customer_Age = $request->customer_Age;
+        $customer->customer_Address = $request->customer_Address;
+        $customer->customer_Position = $request->customer_Position;
+        $customer->customer_SkillLevel = $request->customer_SkillLevel;
+        $customer->customer_Availability = $availability;
+
+        // --- NEW: IMAGE UPLOAD LOGIC ---
+        if ($request->hasFile('customer_Image')) {
+            // Delete old image if exists
+            if ($customer->customer_Image && \Illuminate\Support\Facades\Storage::disk('public')->exists($customer->customer_Image)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($customer->customer_Image);
+            }
+            // Store new image
+            $path = $request->file('customer_Image')->store('profiles', 'public');
+            $customer->customer_Image = $path;
+        }
+        // -------------------------------
+
+        $customer->save();
+        
+        // Update session name
+        session(['full_name' => $customer->customer_FullName]);
+
+        return redirect()->route('customer.profile')->with('success', 'Profile updated successfully!');
     }
-
-    // Update customer details
-    $customer->update([
-        'customer_FullName'     => $request->customer_FullName,
-        'customer_PhoneNumber'  => $request->customer_PhoneNumber,
-        'customer_Age'          => $request->customer_Age,
-        'customer_Address'      => $request->customer_Address,
-        'customer_Position'     => $request->customer_Position,
-        'customer_SkillLevel'   => $request->customer_SkillLevel,
-        'customer_Availability' => $availability,
-    ]);
-
-    return redirect()->route('customer.profile')->with('success', 'Profile updated successfully!');
-}
 
 public function updateCustomerPassword(Request $request)
     {
@@ -193,101 +204,96 @@ public function destroy(Request $request)
 // In app/Http/Controllers/ProfileController.php
 
 public function dashboard()
-{
-    $userId = session('user_id');
-    $now = Carbon::now('Asia/Kuala_Lumpur');
+    {
+        $userId = session('user_id');
+        $now = Carbon::now('Asia/Kuala_Lumpur');
 
-    // 1. Get the customer
-    $customer = Customer::where('userID', $userId)->first();
-    if (!$customer) {
-        return redirect()->route('login')->with('error', 'Customer profile not found.');
+        // 1. Get the customer
+        $customer = Customer::where('userID', $userId)->first();
+        if (!$customer) {
+            return redirect()->route('login')->with('error', 'Customer profile not found.');
+        }
+
+        // 2. Get "Next Booking"
+        $nextBooking = Booking::with('field', 'slot')
+            ->where('booking.userID', $userId)
+            ->whereIn('booking.booking_Status', ['paid', 'completed'])
+            ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+            ->where('slot.slot_Date', '>=', $now->toDateString())
+            ->where(function($query) use ($now) {
+                $query->where('slot.slot_Date', '>', $now->toDateString())
+                        ->orWhere(function($query) use ($now) {
+                            $query->where('slot.slot_Date', '=', $now->toDateString())
+                                    ->where('slot.slot_Time', '>', $now->toTimeString());
+                        });
+            })
+            ->orderBy('slot.slot_Date', 'asc')
+            ->orderBy('slot.slot_Time', 'asc')
+            ->select('booking.*')
+            ->first();
+
+        // 3. Get "Upcoming Bookings" Table (Recent History)
+        $upcomingBookingsTable = Booking::with('field', 'slot')
+            ->where('booking.userID', $userId)
+            ->whereIn('booking.booking_Status', ['paid', 'completed'])
+            ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+            ->where('slot.slot_Date', '>=', $now->toDateString())
+            ->orderBy('slot.slot_Date', 'asc')
+            ->orderBy('slot.slot_Time', 'asc')
+            ->select('booking.*')
+            ->take(3)
+            ->get();
+        
+        // 4. Get Data for "Monthly Bookings" Chart
+        $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
+        $monthlyData = Booking::where('userID', $userId)
+            ->where('booking_Status', 'paid')
+            ->where('booking_CreatedAt', '>=', $sixMonthsAgo)
+            ->select(DB::raw('COUNT(*) as count'), DB::raw('DATE_FORMAT(booking_CreatedAt, "%Y-%m") as month'))
+            ->groupBy('month')->orderBy('month', 'asc')->get();
+
+        $chartLabels = [];
+        $chartData = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $monthKey = $now->copy()->subMonths($i)->format('Y-m');
+            $label = $now->copy()->subMonths($i)->format('M');
+            $chartLabels[] = $label;
+            
+            $data = $monthlyData->firstWhere('month', $monthKey);
+            $chartData[] = $data ? $data->count : 0;
+        }
+
+        // 5. KPI Stats
+        $kpi_totalBookings = Booking::where('userID', $userId)
+            ->whereIn('booking_Status', ['paid', 'completed'])
+            ->count();
+        
+        $kpi_activeRentals = Rental::where('userID', $userId)
+            ->where('rental_Status', 'paid')
+            ->where('rental_EndDate', '>=', $now->toDateString())
+            ->count();
+
+        $kpi_newApplications = Applications::where('status', 'pending')
+            ->whereHas('advertisement', function ($query) use ($customer) {
+                $query->where('customerID', $customer->customerID);
+            })
+            ->count();
+
+        return view('Profile.customer.dashboard', [
+            'fullName' => $customer->customer_FullName,
+            
+            // --- THIS WAS THE FIX ---
+            'nextMatch' => $nextBooking, // Pass $nextBooking as 'nextMatch'
+            // ------------------------
+
+            'upcomingBookingsTable' => $upcomingBookingsTable,
+            'kpi_totalBookings' => $kpi_totalBookings,
+            'kpi_activeRentals' => $kpi_activeRentals,
+            'kpi_newApplications' => $kpi_newApplications,
+            'chartLabels' => json_encode($chartLabels),
+            'chartData' => json_encode($chartData),
+        ]);
     }
-
-    // 2. Get Data for "Next Booking" panel
-    $nextBooking = Booking::with('field', 'slot')
-        ->where('booking.userID', $userId)
-        ->where('booking.booking_Status', 'paid') // Only find 'paid' bookings
-        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
-        ->where('slot.slot_Date', '>=', $now->toDateString())
-        ->where(function($query) use ($now) { // Ensure it hasn't already passed today
-            $query->where('slot.slot_Date', '>', $now->toDateString())
-                    ->orWhere(function($query) use ($now) {
-                        $query->where('slot.slot_Date', '=', $now->toDateString())
-                                ->where('slot.slot_Time', '>', $now->toTimeString());
-                    });
-        })
-        ->orderBy('slot.slot_Date', 'asc')
-        ->orderBy('slot.slot_Time', 'asc')
-        ->select('booking.*')
-        ->first();
-
-    // 3. Get Data for "Upcoming Bookings" table
-    $upcomingBookingsTable = Booking::with('field', 'slot')
-        ->where('booking.userID', $userId)
-        ->where('booking.booking_Status', 'paid') // Only 'paid'
-        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
-        ->where('slot.slot_Date', '>=', $now->toDateString())
-        ->orderBy('slot.slot_Date', 'asc')
-        ->orderBy('slot.slot_Time', 'asc')
-        ->select('booking.*')
-        ->take(3) // Get the next 3
-        ->get();
-    
-    // 4. Get Data for "Monthly Bookings" Chart
-    $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
-    $monthlyData = Booking::where('userID', $userId)
-        ->where('booking_Status', 'paid')
-        ->where('booking_CreatedAt', '>=', $sixMonthsAgo)
-        ->select(DB::raw('COUNT(*) as count'), DB::raw('DATE_FORMAT(booking_CreatedAt, "%Y-%m") as month'))
-        ->groupBy('month')->orderBy('month', 'asc')->get();
-
-    $chartLabels = [];
-    $chartData = [];
-    for ($i = 5; $i >= 0; $i--) {
-        $monthKey = $now->copy()->subMonths($i)->format('Y-m');
-        $label = $now->copy()->subMonths($i)->format('M');
-        $chartLabels[] = $label;
-        
-        $data = $monthlyData->firstWhere('month', $monthKey);
-        $chartData[] = $data ? $data->count : 0;
-    }
-
-    // 5. Get Data for "Action Hub" (KPIs)
-    $kpi_totalBookings = Booking::where('userID', $userId)
-        ->where('booking_Status', 'paid')
-        ->count();
-    
-    $kpi_activeRentals = Rental::where('userID', $userId)
-        ->where('rental_Status', 'paid')
-        ->where('rental_EndDate', '>=', $now->toDateString())
-        ->count();
-
-    $kpi_newApplications = Applications::where('status', 'pending')
-        ->whereHas('advertisement', function ($query) use ($customer) {
-            $query->where('customerID', $customer->customerID);
-        })
-        ->count();
-
-    return view('Profile.customer.dashboard', [
-        'fullName' => $customer->customer_FullName,
-        
-        // Data for new Action Hub
-        'kpi_totalBookings' => $kpi_totalBookings,
-        'kpi_activeRentals' => $kpi_activeRentals,
-        'kpi_newApplications' => $kpi_newApplications,
-
-        // Data for other panels
-        'nextBooking' => $nextBooking,
-        'upcomingBookingsTable' => $upcomingBookingsTable,
-        
-        // --- THIS IS THE FIX ---
-        // We must encode the PHP arrays into JSON strings here
-        'chartLabels' => json_encode($chartLabels),
-        'chartData' => json_encode($chartData),
-        // --- END FIX ---
-    ]);
-}
-
 
 //ADMIN SECTION
 
@@ -315,6 +321,8 @@ public function showAdminProfile(Request $request)
         'phoneNumber' => $admin->admin_PhoneNumber,
         'age' => $admin->admin_Age,
         'address' => $admin->admin_Address,
+        'adminPhoto' => $admin->admin_Photo,
+
     ]);
 }
 
@@ -342,6 +350,7 @@ public function editAdmin()
 public function updateAdmin(Request $request)
 {
     $userId = session('user_id');
+
     $user = User::where('userID', $userId)->first();
     $admin = Administrator::where('userID', $userId)->first();
 
@@ -349,27 +358,46 @@ public function updateAdmin(Request $request)
         return redirect()->route('admin.profile')->with('error', 'Profile not found.');
     }
 
-    // Validate input
+    // ✅ Validate input including photo
     $request->validate([
         'admin_FullName' => 'required|string|max:255',
         'user_Email' => 'required|email',
         'admin_PhoneNumber' => 'required|string|max:20',
         'admin_Age' => 'required|integer|min:1|max:120',
         'admin_Address' => 'required|string|max:255',
+
+        // ✅ NEW validation
+        'admin_Photo' => 'nullable|image|max:2048',
     ]);
 
-    // Update user email
+    // ✅ Update user email
     $user->update([
         'user_Email' => $request->user_Email,
     ]);
 
-    // Update admin details
+    // ✅ Update admin details
     $admin->update([
         'admin_FullName' => $request->admin_FullName,
         'admin_PhoneNumber' => $request->admin_PhoneNumber,
         'admin_Age' => $request->admin_Age,
         'admin_Address' => $request->admin_Address,
     ]);
+
+    // ✅ Handle profile photo upload
+    if ($request->hasFile('admin_Photo')) {
+
+        // ✅ Delete old image if exists
+        if ($admin->admin_Photo) {
+            Storage::delete('public/' . $admin->admin_Photo);
+        }
+
+        // ✅ Store new photo under storage/app/public/admin_photos
+        $path = $request->file('admin_Photo')->store('admin_photos', 'public');
+
+        // ✅ Save new filename in DB
+        $admin->admin_Photo = $path;
+        $admin->save();
+    }
 
     return redirect()->route('admin.profile')->with('success', 'Profile updated successfully!');
 }
@@ -441,6 +469,7 @@ public function showStaffProfile(Request $request)
             'age'         => $staff->staff_Age,
             'address'     => $staff->staff_Address,
             'job'         => $staff->staff_Job,
+            'staff' => $staff,
         ]);
     }
 
@@ -459,7 +488,9 @@ public function showStaffProfile(Request $request)
         }
 
         $fullName = $staff->staff_FullName;
-        return view('Profile.staff.editPage', compact('user', 'staff', 'fullName'));
+        $image = $staff->staff_image;
+
+        return view('Profile.staff.editPage', compact('user', 'staff', 'fullName', 'image'));
     }
 
     /**
@@ -482,6 +513,8 @@ public function showStaffProfile(Request $request)
             'staff_PhoneNumber' => 'required|string|max:20',
             'staff_Age' => 'required|integer|min:18|max:100',
             'staff_Address' => 'required|string|max:255',
+            'staff_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+
         ]);
 
         $user->update(['user_Email' => $request->user_Email]);
@@ -492,6 +525,23 @@ public function showStaffProfile(Request $request)
             'staff_Age', 
             'staff_Address'
         ]));
+
+    if ($request->hasFile('staff_image')) {
+
+    // Delete old image if exists
+    if ($staff->staff_image && Storage::disk('public')->exists($staff->staff_image)) {
+        Storage::disk('public')->delete($staff->staff_image);
+    }
+
+    // Upload new image to 'staff_photos' folder in storage/app/public
+    $path = $request->file('staff_image')->store('staff_photos', 'public');
+
+    // Save path in DB
+    $staff->staff_image = $path;
+    $staff->save();
+}
+
+
 
         // --- THIS IS THE FIX ---
         return redirect()->route('staff.profile')->with('success', 'Profile updated successfully!');

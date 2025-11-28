@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeMail;
+use App\Mail\StaffWelcomeMail;
+
+
 
 class RegisterController extends Controller
 {
@@ -59,6 +64,8 @@ class RegisterController extends Controller
             ]);
 
             DB::commit();
+            Mail::to($validated['user_Email'])->send(new WelcomeMail($validated['customer_FullName']));
+
 
             return redirect()->route('login')->with('success', 'Registration successful! Please login.');
 
@@ -119,6 +126,8 @@ class RegisterController extends Controller
                 'staff_Address' => $validated['staff_Address'],
                 'userID' => $userID,
             ]);
+            Mail::to($validated['user_Email'])
+                ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
 
             $message = "Staff registered successfully! Staff ID: $staffID";
         } else {
@@ -133,6 +142,8 @@ class RegisterController extends Controller
                 'admin_Address' => $validated['staff_Address'],
                 'userID' => $userID,
             ]);
+            Mail::to($validated['user_Email'])
+                ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
 
             $message = "Administrator registered successfully! Admin ID: $adminID";
         }

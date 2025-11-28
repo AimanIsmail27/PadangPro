@@ -429,11 +429,191 @@ public function rentalPaymentCallback(Request $request)
     }
 
 
+    // =================================================================
+    // RENTAL: BALANCE PAYMENT (Post-Return Approval)
+    // =================================================================
+
+    public function createRentalBalancePayment(Request $request, $rentalID)
+    {
+        $rental = Rental::with('item')->where('rentalID', $rentalID)->firstOrFail();
+        
+       
+        $days = \Carbon\Carbon::parse($rental->rental_StartDate)
+                    ->diffInDays(\Carbon\Carbon::parse($rental->rental_EndDate)) + 1;
+        
+        $totalCost = $days * $rental->quantity * $rental->item->item_Price;
+        
+        // Calculate 80% balance
+        $balance = $totalCost * 0.80; 
+       
+        if ($balance < 1) {
+             return redirect()->back()->with('error', 'Balance amount is too small to process online.');
+        }
+
+        $amount = intval($balance * 100); // Convert to cents
+
+        // ... (The rest of your ToyyibPay code remains exactly the same) ...
+        $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
+            'userSecretKey'         => env('TOYYIBPAY_SECRET_DEV'),
+            'categoryCode'          => env('TOYYIBPAY_CATEGORY_RENTAL'),
+            'billName'              => 'PadangPro Rental Balance',
+            'billDescription'       => 'Balance payment for rental ' . $rental->rentalID,
+            'billPriceSetting'      => 1,
+            'billPayorInfo'         => 1,
+            'billAmount'            => $amount,
+            'billReturnUrl'         => route('payment.rental.balance.return'), 
+            'billCallbackUrl'       => route('payment.rental.balance.callback'),
+            'billExternalReferenceNo' => $rental->rentalID,
+            'billTo'                => $rental->rental_Name,
+            'billEmail'             => $rental->rental_Email,
+            'billPhone'             => $rental->rental_PhoneNumber,
+        ]);
+
+        if (!$response->successful() || !isset($response->json()[0]['BillCode'])) {
+            \Log::error('ToyyibPay Error:', ['response' => $response->body()]);
+            return redirect()->back()->with('error', 'Could not initiate balance payment. Please try again.');
+        }
+
+        $bill = $response->json()[0];
+
+        Payment::create([
+            'paymentID'       => 'PAY' . uniqid(),
+            'payer_Name'      => $rental->rental_Name,
+            'payment_Amount'  => $balance,
+            'payment_Status'  => 'pending_balance', 
+            'rentalID'        => $rental->rentalID,
+            'userID'          => $rental->userID,
+        ]);
+
+        return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $bill['BillCode']);
+    }
+
+    /**
+     * 2. Handle User Return (Update DB here for localhost testing)
+     */
+    public function rentalBalanceReturn(Request $request)
+    {
+        $status   = $request->status_id ?? $request->status;
+        $rentalID = $request->order_id ?? $request->billExternalReferenceNo;
+        $refNo    = $request->refno ?? null;
+
+        if (!$rentalID) {
+            return redirect()->route('customer.rental.history')->with('error', 'Payment status unknown.');
+        }
+
+        if ($status == 1) {
+            // Find the pending balance payment
+            $payment = Payment::where('rentalID', $rentalID)
+                              ->where('payment_Status', 'pending_balance')
+                              ->latest()->first();
+
+            if ($payment) {
+                // Update Payment Status
+                $payment->update([
+                    'payment_Status'    => 'paid_balance',
+                    'payer_BankAccount' => $refNo
+                ]);
+
+                // Update Rental Status to COMPLETED
+                Rental::where('rentalID', $rentalID)->update([
+                    'rental_Status' => 'completed'
+                ]);
+            }
+
+            return redirect()->route('customer.rental.history')
+                             ->with('success', 'Balance paid successfully! Rental completed.');
+        } else {
+            // Handle failure
+            $payment = Payment::where('rentalID', $rentalID)
+                              ->where('payment_Status', 'pending_balance')
+                              ->latest()->first();
+            
+            if ($payment) {
+                $payment->update(['payment_Status' => 'failed']);
+            }
+
+            return redirect()->route('customer.rental.history')
+                             ->with('error', 'Balance payment failed or was cancelled.');
+        }
+    }
+
+    /**
+     * 3. Handle Server Callback (For production reliability)
+     */
+    public function rentalBalanceCallback(Request $request)
+    {
+        $rentalID = $request->billExternalReferenceNo;
+        $status   = $request->status;
+        $refNo    = $request->refno ?? null;
+
+        $payment = Payment::where('rentalID', $rentalID)
+                          ->where('payment_Status', 'pending_balance')
+                          ->latest()->first();
+
+        if ($payment && $status == 1) {
+            $payment->update([
+                'payment_Status'    => 'paid_balance',
+                'payer_BankAccount' => $refNo
+            ]);
+            
+            Rental::where('rentalID', $rentalID)->update([
+                'rental_Status' => 'completed'
+            ]);
+        }
+
+        return response()->json(['status' => 'OK']);
+    }
 
 
+/**
+     * Allows Staff/Admin to manually mark a RENTAL as 'completed'
+     * (e.g., when a customer pays the rental balance in cash).
+     */
+    public function markRentalAsCompleted(Request $request, $rentalID)
+    {
+        // Get user type from session
+        $userType = session('user_type');
+        
+        // Ensure only staff or admin can do this
+        if ($userType !== 'staff' && $userType !== 'administrator') {
+            return redirect()->route('customer.dashboard')->with('error', 'Unauthorized action.');
+        }
 
+        $rental = Rental::with('item')->findOrFail($rentalID);
 
+        // Check if the rental is in the correct status to be completed
+        if ($rental->rental_Status == 'paid') {
+            
+            // 1. Calculate the 80% Balance (since it's not stored in DB)
+            $days = \Carbon\Carbon::parse($rental->rental_StartDate)
+                ->diffInDays(\Carbon\Carbon::parse($rental->rental_EndDate)) + 1;
+            
+            $totalCost = $days * $rental->quantity * $rental->item->item_Price;
+            $balanceAmount = $totalCost * 0.80;
 
+            // 2. Update the rental status
+            $rental->update(['rental_Status' => 'completed']);
+
+            // 3. Create a new payment record for this cash payment
+            Payment::create([
+                'paymentID'       => 'PAY' . uniqid(),
+                'payer_Name'      => $rental->rental_Name,
+                'payment_Amount'  => $balanceAmount,
+                'payment_Status'  => 'paid_balance (cash)', // Special status for cash
+                'rentalID'        => $rental->rentalID,
+                'userID'          => $rental->userID,
+                'payer_BankAccount' => 'CASH_AT_COUNTER' // Record how it was paid
+            ]);
+            
+            // Redirect back to the previous page (works for both Admin and Staff views)
+            return redirect()->back()->with('success', 'Rental ' . $rentalID . ' has been marked as completed.');
+
+        } elseif ($rental->rental_Status == 'completed') {
+             return redirect()->back()->with('error', 'This rental is already completed.');
+        } else {
+             return redirect()->back()->with('error', 'This rental is not in a valid state to be completed.');
+        }
+    }
 
 
 

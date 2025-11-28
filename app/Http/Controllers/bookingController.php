@@ -7,6 +7,7 @@ use App\Models\Field;
 use App\Models\Slot;
 use App\Models\Booking;
 use App\Models\User;
+use App\Models\Rating;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -58,27 +59,64 @@ class BookingController extends Controller
         $slotsForCalendar = $this->prepareSlotsForCalendar($fieldID);
         $allFields = Field::all();
 
-        // This will now correctly look for 'booking.admin.MainSlotBookingPage' or 'booking.staff.MainSlotBookingPage'
+        // --- NEW: Fetch Reviews for this Field ---
+        // We need to find Ratings -> linked to Bookings -> linked to this Field
+        $reviews = Rating::whereHas('booking', function ($query) use ($fieldID) {
+                $query->where('fieldID', $fieldID);
+            })
+            ->with('customer.user') // Eager load customer name
+            ->latest('review_Date')
+            ->paginate(4);
+
+        // Calculate Average Rating
+        $averageRating = $reviews->avg('rating_Score');
+        $totalReviews = $reviews->count();
+
         return view($viewContext->path . '.MainSlotBookingPage', [
             'field' => $field,
             'slotsForCalendar' => $slotsForCalendar,
             'allFields' => $allFields,
             'date' => Carbon::today('Asia/Kuala_Lumpur')->toDateString(),
+            // Pass the new review data
+            'reviews' => $reviews,
+            'averageRating' => $averageRating,
+            'totalReviews' => $totalReviews,
         ]);
     }
 
     public function showMiniFieldBooking()
     {
         $viewContext = $this->getViewContext();
+        
+        // 1. Get the Mini Field
         $field = Field::where('field_Size', "MINI SIZED FOOTBALL PITCH(9'S)")->first();
         if (!$field) abort(404, 'Field not found.');
 
         $slotsForCalendar = $this->prepareSlotsForCalendar($field->fieldID);
 
+        // 2. NEW: Fetch Reviews for this specific Field
+        $reviews = \App\Models\Rating::whereHas('booking', function ($query) use ($field) {
+                $query->where('fieldID', $field->fieldID);
+            })
+            ->with('customer.user') // Eager load customer info
+            ->latest('review_Date')
+            ->paginate(4); // Pagination
+
+        // 3. Calculate Average Rating
+        $averageRating = \App\Models\Rating::whereHas('booking', function ($query) use ($field) {
+                $query->where('fieldID', $field->fieldID);
+            })->avg('rating_Score');
+            
+        $totalReviews = $reviews->total();
+
         return view($viewContext->path . '.MiniSlotBookingPage', [
             'field' => $field,
             'slotsForCalendar' => $slotsForCalendar,
             'date' => Carbon::today('Asia/Kuala_Lumpur')->toDateString(),
+            // Pass the new data to the view
+            'reviews' => $reviews,
+            'averageRating' => $averageRating,
+            'totalReviews' => $totalReviews,
         ]);
     }
 
@@ -98,7 +136,7 @@ class BookingController extends Controller
         // Availability Check ...
         $isBooked = Booking::where('slotID', $request->slotID)
             ->where(function ($q) {
-                $q->whereIn('booking_Status', ['paid', 'confirmed'])
+                $q->whereIn('booking_Status', ['paid', 'confirmed', 'completed'])
                   ->orWhere(function ($q2) {
                       $q2->where('booking_Status', 'pending')
                          ->where('booking_CreatedAt', '>=', now()->subMinutes(10));
@@ -335,7 +373,7 @@ public function viewBookings(Request $request)
         }
         $isBooked = Booking::where('slotID', $slot->slotID)
             ->where(function ($q) {
-                $q->where('booking_Status', 'confirmed')
+                $q->whereIn('booking_Status', ['paid', 'confirmed', 'completed'])
                   ->orWhere(function ($q2) {
                       $q2->where('booking_Status', 'pending')
                          ->where('booking_CreatedAt', '>=', now()->subMinutes(10));
@@ -370,7 +408,7 @@ public function viewBookings(Request $request)
                 if ($status === 'available') {
                     $isBooked = Booking::where('slotID', $slot->slotID)
                         ->where(function ($q) {
-                            $q->where('booking_Status', 'paid')
+                            $q->whereIn('booking_Status', ['paid', 'completed'])
                               ->orWhere(function ($q2) {
                                   $q2->where('booking_Status', 'pending')
                                      ->where('booking_CreatedAt', '>=', now()->subMinutes(10));
