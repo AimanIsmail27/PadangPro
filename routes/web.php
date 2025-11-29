@@ -5,7 +5,7 @@ use App\Http\Controllers\loginController;
 use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\registerController;
 use App\Http\Controllers\profileController;
-use App\Http\Controllers\BookingController;
+use App\Http\Controllers\bookingController;
 use App\Http\Controllers\PaymentController; 
 use App\Http\Controllers\RentalController;
 use App\Http\Controllers\MatchController;
@@ -103,17 +103,17 @@ Route::middleware([AuthSession::class, PreventBackHistory::class])->group(functi
 
     // --- CUSTOMER: Booking Routes ---
     Route::prefix('booking')->name('booking.')->middleware('role:customer')->group(function () {
-        Route::get('/view', [BookingController::class, 'viewBookings'])->name('view');
-        Route::get('/mini', [BookingController::class, 'showMiniFieldBooking'])->name('mini');
-        Route::get('/field/{fieldID}', [BookingController::class, 'showBookingPage'])->name('page');
-        Route::post('/book', [BookingController::class, 'bookSlot'])->name('book');
-        Route::post('/store', [BookingController::class, 'store'])->name('store');
-        Route::get('/{slotID}/add', [BookingController::class, 'add'])->name('add');
-        Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');
-        Route::get('/{bookingID}/confirmation', [BookingController::class, 'confirmation'])->name('confirmation');
-        Route::put('/{bookingID}', [BookingController::class, 'update'])->name('update');
-        Route::delete('/{bookingID}/cancel', [BookingController::class, 'destroy'])->name('cancel');
-        Route::get('/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('slots.json');
+        Route::get('/view', [bookingController::class, 'viewBookings'])->name('view');
+        Route::get('/mini', [bookingController::class, 'showMiniFieldBooking'])->name('mini');
+        Route::get('/field/{fieldID}', [bookingController::class, 'showBookingPage'])->name('page');
+        Route::post('/book', [bookingController::class, 'bookSlot'])->name('book');
+        Route::post('/store', [bookingController::class, 'store'])->name('store');
+        Route::get('/{slotID}/add', [bookingController::class, 'add'])->name('add');
+        Route::get('/{booking}/edit', [bookingController::class, 'edit'])->name('edit');
+        Route::get('/{bookingID}/confirmation', [bookingController::class, 'confirmation'])->name('confirmation');
+        Route::put('/{bookingID}', [bookingController::class, 'update'])->name('update');
+        Route::delete('/{bookingID}/cancel', [bookingController::class, 'destroy'])->name('cancel');
+        Route::get('/{fieldID}/slots-json', [bookingController::class, 'getSlotsJson'])->name('slots.json');
     });
 
     // --- CUSTOMER: Payment Route ---
@@ -173,15 +173,15 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
 
     // --- ADMIN: Booking Routes ---
     Route::prefix('admin/booking')->name('admin.booking.')->middleware('role:administrator')->group(function () {
-        Route::get('/manage', [BookingController::class, 'showBookingPage'])->name('manage');
-        Route::get('/view-all', [BookingController::class, 'viewBookings'])->name('viewAll');
-        Route::get('/mini', [BookingController::class, 'showMiniFieldBooking'])->name('mini');
-        Route::get('/{slotID}/add', [BookingController::class, 'add'])->name('add');
-        Route::post('/store', [BookingController::class, 'store'])->name('store');
-        Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');
-        Route::put('/{bookingID}', [BookingController::class, 'update'])->name('update');
-        Route::delete('/{bookingID}/cancel', [BookingController::class, 'destroy'])->name('cancel');
-        Route::get('/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('slots.json');
+        Route::get('/manage', [bookingController::class, 'showBookingPage'])->name('manage');
+        Route::get('/view-all', [bookingController::class, 'viewBookings'])->name('viewAll');
+        Route::get('/mini', [bookingController::class, 'showMiniFieldBooking'])->name('mini');
+        Route::get('/{slotID}/add', [bookingController::class, 'add'])->name('add');
+        Route::post('/store', [bookingController::class, 'store'])->name('store');
+        Route::get('/{booking}/edit', [bookingController::class, 'edit'])->name('edit');
+        Route::put('/{bookingID}', [bookingController::class, 'update'])->name('update');
+        Route::delete('/{bookingID}/cancel', [bookingController::class, 'destroy'])->name('cancel');
+        Route::get('/{fieldID}/slots-json', [bookingController::class, 'getSlotsJson'])->name('slots.json');
     });
 
     // --- ADMIN: Rental Route ---
@@ -208,15 +208,15 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
 
     // --- STAFF: Booking Routes ---
     Route::prefix('staff/booking')->name('staff.booking.')->middleware('role:staff')->group(function () {
-        Route::get('/manage', [BookingController::class, 'showBookingPage'])->name('manage');
-        Route::get('/view-all', [BookingController::class, 'viewBookings'])->name('viewAll');
-        Route::get('/mini', [BookingController::class, 'showMiniFieldBooking'])->name('mini');
-        Route::get('/{slotID}/add', [BookingController::class, 'add'])->name('add');
-        Route::post('/store', [BookingController::class, 'store'])->name('store');
-        Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');
-        Route::put('/{bookingID}', [BookingController::class, 'update'])->name('update');
-        Route::delete('/{bookingID}/cancel', [BookingController::class, 'destroy'])->name('cancel');
-        Route::get('/{fieldID}/slots-json', [BookingController::class, 'getSlotsJson'])->name('slots.json');
+        Route::get('/manage', [bookingController::class, 'showBookingPage'])->name('manage');
+        Route::get('/view-all', [bookingController::class, 'viewBookings'])->name('viewAll');
+        Route::get('/mini', [bookingController::class, 'showMiniFieldBooking'])->name('mini');
+        Route::get('/{slotID}/add', [bookingController::class, 'add'])->name('add');
+        Route::post('/store', [bookingController::class, 'store'])->name('store');
+        Route::get('/{booking}/edit', [bookingController::class, 'edit'])->name('edit');
+        Route::put('/{bookingID}', [bookingController::class, 'update'])->name('update');
+        Route::delete('/{bookingID}/cancel', [bookingController::class, 'destroy'])->name('cancel');
+        Route::get('/{fieldID}/slots-json', [bookingController::class, 'getSlotsJson'])->name('slots.json');
     });
 
     // --- STAFF: Payment Routes ---
