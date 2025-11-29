@@ -306,7 +306,7 @@ public function viewBookings(Request $request)
         $this->formatBookingCollection($completedBookings->getCollection());
 
 
-        return view($viewContext->path . '.viewBooking', [
+        return view($viewContext->path . '.ViewBooking', [
             'pendingBookings' => $pendingBookings,
             'completedBookings' => $completedBookings,
             'monthList' => $monthList,
