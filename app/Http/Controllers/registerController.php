@@ -21,7 +21,7 @@ class RegisterController extends Controller
 {
     public function showRegistrationForm()
     {
-        return view('auth.Register'); // adjust this if your view file name is different
+        return view('auth.register'); // adjust this if your view file name is different
     }
 
     public function register(Request $request)
