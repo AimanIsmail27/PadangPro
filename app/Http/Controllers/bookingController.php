@@ -26,14 +26,14 @@ class BookingController extends Controller
                 return (object)[
                     'is_admin_or_staff' => true,
                     'user_type' => 'admin', // Use 'admin' to match your route name 'admin.booking.viewAll'
-                    'path' => 'booking.admin' // resources/views/booking/admin/
+                    'path' => 'Booking.admin' // resources/views/booking/admin/
                 ];
             }
             if ($userType === 'staff') {
                 return (object)[
                     'is_admin_or_staff' => true,
                     'user_type' => 'staff', // Use 'staff' to match your route name 'staff.booking.viewAll'
-                    'path' => 'booking.staff' // resources/views/booking/staff/
+                    'path' => 'Booking.staff' // resources/views/booking/staff/
                 ];
             }
         }
@@ -41,7 +41,7 @@ class BookingController extends Controller
         return (object)[
             'is_admin_or_staff' => false,
             'user_type' => 'customer',
-            'path' => 'booking.customer' // Views folder: resources/views/booking/customer/
+            'path' => 'Booking.customer' // Views folder: resources/views/booking/customer/
         ];
     }
 
@@ -156,7 +156,7 @@ class BookingController extends Controller
         if ($viewContext->is_admin_or_staff) {
             $userID = session('user_id');
             $bookingStatus = 'paid'; 
-            $redirectRoute = $viewContext->user_type . '.booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
+            $redirectRoute = $viewContext->user_type . '.Booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
         } else {
             $userID = session('user_id');
             $bookingStatus = 'pending';
@@ -229,7 +229,7 @@ public function viewBookings(Request $request)
 
             $customerQuery->join('slot', 'booking.slotID', '=', 'slot.slotID')
                           ->whereDate('slot.slot_Date', $searchDate)
-                          ->select('booking.*'); // Avoid column conflicts
+                          ->select('Booking.*'); // Avoid column conflicts
             
             // Set selectedMonth to null so the dropdown doesn't show a confusing value
             $selectedMonth = null; 
@@ -278,12 +278,12 @@ public function viewBookings(Request $request)
 
         // 3. --- QUERY 1: PENDING & AWAITING BALANCE BOOKINGS ---
         $pendingBookingsQuery = Booking::with(['slot', 'field'])
-            ->where('booking.userID', session('user_id'))
-            ->whereIn('booking.booking_Status', ['paid']) // Get pending and deposit-paid
-            ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+            ->where('Booking.userID', session('user_id'))
+            ->whereIn('Booking.booking_Status', ['paid']) // Get pending and deposit-paid
+            ->join('slot', 'Booking.slotID', '=', 'slot.slotID')
             ->whereYear('slot.slot_Date', $year)
             ->whereMonth('slot.slot_Date', $month)
-            ->select('booking.*')
+            ->select('Booking.*')
             ->orderBy('slot.slot_Date', 'asc') 
             ->orderBy('slot.slot_Time', 'asc');
 
@@ -293,12 +293,12 @@ public function viewBookings(Request $request)
 
         // 4. --- QUERY 2: COMPLETED BOOKINGS ---
         $completedBookingsQuery = Booking::with(['slot', 'field'])
-            ->where('booking.userID', session('user_id'))
-            ->where('booking.booking_Status', 'completed') // 'completed' = Full balance paid
-            ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+            ->where('Booking.userID', session('user_id'))
+            ->where('Booking.booking_Status', 'completed') // 'completed' = Full balance paid
+            ->join('slot', 'Booking.slotID', '=', 'slot.slotID')
             ->whereYear('slot.slot_Date', $year)
             ->whereMonth('slot.slot_Date', $month)
-            ->select('booking.*')
+            ->select('Booking.*')
             ->orderBy('slot.slot_Date', 'desc') 
             ->orderBy('slot.slot_Time', 'desc');
 
@@ -511,16 +511,16 @@ public function viewBookings(Request $request)
         ]);
 
         if ($viewContext->is_admin_or_staff) {
-            return redirect()->route($viewContext->user_type . '.booking.viewAll')->with('success', 'Booking updated successfully!');
+            return redirect()->route($viewContext->user_type . '.Booking.viewAll')->with('success', 'Booking updated successfully!');
         } else {
-            return redirect()->route('booking.confirmation', $booking->bookingID)->with('success', 'Booking updated successfully!');
+            return redirect()->route('Booking.confirmation', $booking->bookingID)->with('success', 'Booking updated successfully!');
         }
     }
 
     public function confirmation($bookingID)
     {
         $booking = Booking::with(['field', 'slot'])->findOrFail($bookingID);
-        return view('booking.customer.editPage', compact('booking'));
+        return view('Booking.customer.editPage', compact('booking'));
     }
 
     public function destroy($bookingID)
@@ -531,7 +531,7 @@ public function viewBookings(Request $request)
 
 
         if ($viewContext->is_admin_or_staff) {
-            $redirectRoute = $viewContext->user_type . '.booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
+            $redirectRoute = $viewContext->user_type . '.Booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
         } else {
             $redirectRoute = 'customer.dashboard'; // Customers go to their main dashboard
         }
