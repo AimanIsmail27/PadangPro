@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\loginController;
 use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\registerController;
-use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\profileController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController; 
 use App\Http\Controllers\RentalController;
@@ -72,32 +72,32 @@ Route::middleware([AuthSession::class, PreventBackHistory::class])->group(functi
         
         // --- Staff Routes ---
         Route::middleware('role:staff')->group(function () {
-            Route::get('/staff/dashboard', [ProfileController::class, 'dashboardStaff'])->name('staff.dashboard');
-            Route::get('/staff/profile', [ProfileController::class, 'showStaffProfile'])->name('staff.profile');
-            Route::get('/staff/profile/edit', [ProfileController::class, 'editStaff'])->name('staff.profile.edit');
-            Route::post('/staff/profile/update', [ProfileController::class, 'updateStaff'])->name('staff.profile.update');
-            Route::delete('/staff/profile/delete', [ProfileController::class, 'destroyStaff'])->name('staff.profile.delete');
-            Route::post('/staff/password/update', [ProfileController::class, 'updateStaffPassword'])->name('staff.password.update');
+            Route::get('/staff/dashboard', [profileController::class, 'dashboardStaff'])->name('staff.dashboard');
+            Route::get('/staff/profile', [profileController::class, 'showStaffProfile'])->name('staff.profile');
+            Route::get('/staff/profile/edit', [profileController::class, 'editStaff'])->name('staff.profile.edit');
+            Route::post('/staff/profile/update', [profileController::class, 'updateStaff'])->name('staff.profile.update');
+            Route::delete('/staff/profile/delete', [profileController::class, 'destroyStaff'])->name('staff.profile.delete');
+            Route::post('/staff/password/update', [profileController::class, 'updateStaffPassword'])->name('staff.password.update');
         });
 
         // --- Admin Routes ---
         Route::middleware('role:administrator')->group(function () {
-            Route::get('/administrator/dashboard', [ProfileController::class, 'dashboardAdmin'])->name('administrator.dashboard');
-            Route::get('/admin/profile', [ProfileController::class, 'showAdminProfile'])->name('admin.profile');
-            Route::get('/admin/profile/edit', [ProfileController::class, 'editAdmin'])->name('admin.profile.edit');
-            Route::put('/admin/profile/update', [ProfileController::class, 'updateAdmin'])->name('admin.profile.update');
-            Route::delete('/admin/profile/delete', [ProfileController::class, 'destroyAdmin'])->name('admin.profile.delete');
-            Route::post('/admin/password/update', [ProfileController::class, 'updateAdminPassword'])->name('admin.password.update');
+            Route::get('/administrator/dashboard', [profileController::class, 'dashboardAdmin'])->name('administrator.dashboard');
+            Route::get('/admin/profile', [profileController::class, 'showAdminProfile'])->name('admin.profile');
+            Route::get('/admin/profile/edit', [profileController::class, 'editAdmin'])->name('admin.profile.edit');
+            Route::put('/admin/profile/update', [profileController::class, 'updateAdmin'])->name('admin.profile.update');
+            Route::delete('/admin/profile/delete', [profileController::class, 'destroyAdmin'])->name('admin.profile.delete');
+            Route::post('/admin/password/update', [profileController::class, 'updateAdminPassword'])->name('admin.password.update');
         });
         
         // --- Customer Routes ---
         Route::middleware('role:customer')->group(function () {
-            Route::get('/customer/dashboard', [ProfileController::class, 'dashboard'])->name('customer.dashboard');
-            Route::get('/customer/profile', [ProfileController::class, 'showCustomerProfile'])->name('customer.profile');
-            Route::get('/customer/profile/edit', [ProfileController::class, 'edit'])->name('customer.profile.edit');
-            Route::post('/customer/profile/update', [ProfileController::class, 'update'])->name('customer.profile.update');
-            Route::delete('/customer/profile/delete', [ProfileController::class, 'destroy'])->name('customer.profile.delete');
-            Route::post('/customer/password/update', [ProfileController::class, 'updateCustomerPassword'])->name('customer.password.update');
+            Route::get('/customer/dashboard', [profileController::class, 'dashboard'])->name('customer.dashboard');
+            Route::get('/customer/profile', [profileController::class, 'showCustomerProfile'])->name('customer.profile');
+            Route::get('/customer/profile/edit', [profileController::class, 'edit'])->name('customer.profile.edit');
+            Route::post('/customer/profile/update', [profileController::class, 'update'])->name('customer.profile.update');
+            Route::delete('/customer/profile/delete', [profileController::class, 'destroy'])->name('customer.profile.delete');
+            Route::post('/customer/password/update', [profileController::class, 'updateCustomerPassword'])->name('customer.password.update');
         });
     });
 
