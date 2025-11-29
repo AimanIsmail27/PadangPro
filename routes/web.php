@@ -7,9 +7,9 @@ use App\Http\Controllers\registerController;
 use App\Http\Controllers\profileController;
 use App\Http\Controllers\bookingController;
 use App\Http\Controllers\PaymentController; 
-use App\Http\Controllers\RentalController;
-use App\Http\Controllers\MatchController;
-use App\Http\Controllers\RatingController;
+use App\Http\Controllers\rentalController;
+use App\Http\Controllers\matchController;
+use App\Http\Controllers\ratingController;
 use App\Http\Controllers\ReportController; 
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\AuthSession;
@@ -20,7 +20,7 @@ use App\Http\Middleware\AuthSession;
 
 Route::view('/', 'landing.home')->name('home');
 Route::view('/about', 'landing.about')->name('about');
-Route::get('/latest-reviews', [RatingController::class, 'getLatestReviews'])->name('reviews.latest');
+Route::get('/latest-reviews', [ratingController::class, 'getLatestReviews'])->name('reviews.latest');
 
 // --- Google Login ---
 Route::get('/login/google', [GoogleController::class, 'redirectToGoogle'])->name('login.google');
@@ -124,51 +124,51 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
 
     // --- CUSTOMER: Rental Routes ---
     Route::prefix('customer/rental')->name('customer.rental.')->middleware('role:customer')->group(function() {
-        Route::get('/', [RentalController::class, 'indexCustomer'])->name('main');
-        Route::get('/rent/{itemID}', [RentalController::class, 'rentPage'])->name('rent');
-        Route::post('/rent/{itemID}', [RentalController::class, 'processRent'])->name('process');
-        Route::get('/check-availability/{itemID}', [RentalController::class, 'checkAvailability'])->name('checkAvailability');
-        Route::get('/confirmation/{rentalID}', [RentalController::class, 'showConfirmation'])->name('confirmation');
-        Route::post('/confirm', [RentalController::class, 'confirmBooking'])->name('confirm');
-        Route::get('/rental/{rentalID}/edit', [RentalController::class, 'editPage'])->name('edit');
-        Route::post('/rental/{rentalID}/update', [RentalController::class, 'updateRent'])->name('update');
-        Route::delete('/rental/{rentalID}', [RentalController::class, 'destroyCustomer'])->name('destroy');
+        Route::get('/', [rentalController::class, 'indexCustomer'])->name('main');
+        Route::get('/rent/{itemID}', [rentalController::class, 'rentPage'])->name('rent');
+        Route::post('/rent/{itemID}', [rentalController::class, 'processRent'])->name('process');
+        Route::get('/check-availability/{itemID}', [rentalController::class, 'checkAvailability'])->name('checkAvailability');
+        Route::get('/confirmation/{rentalID}', [rentalController::class, 'showConfirmation'])->name('confirmation');
+        Route::post('/confirm', [rentalController::class, 'confirmBooking'])->name('confirm');
+        Route::get('/rental/{rentalID}/edit', [rentalController::class, 'editPage'])->name('edit');
+        Route::post('/rental/{rentalID}/update', [rentalController::class, 'updateRent'])->name('update');
+        Route::delete('/rental/{rentalID}', [rentalController::class, 'destroyCustomer'])->name('destroy');
         Route::post('/{rentalID}/pay', [PaymentController::class, 'createRentalPayment'])->name('pay');
-        Route::get('/history', [RentalController::class, 'viewRentalHistory'])->name('history');
-        Route::post('/{rentalID}/request-approval', [RentalController::class, 'requestApproval'])->name('requestApproval');
+        Route::get('/history', [rentalController::class, 'viewRentalHistory'])->name('history');
+        Route::post('/{rentalID}/request-approval', [rentalController::class, 'requestApproval'])->name('requestApproval');
     });
 
     // --- CUSTOMER: Matchmaking Routes ---
     Route::prefix('matchmaking')->name('matchmaking.')->middleware('role:customer')->group(function () {
-        Route::get('/personal', [MatchController::class, 'personalAds'])->name('personal');
-        Route::get('/other', [MatchController::class, 'otherAds'])->name('other');
+        Route::get('/personal', [matchController::class, 'personalAds'])->name('personal');
+        Route::get('/other', [matchController::class, 'otherAds'])->name('other');
         Route::get('/add', fn() => view('Matchmaking.addOfferPage'))->name('add');
-        Route::post('/store', [MatchController::class, 'store'])->name('store');
-        Route::get('/view/{adsID}', [MatchController::class, 'view'])->name('view');
-        Route::get('/edit/{adsID}', [MatchController::class, 'edit'])->name('edit');
-        Route::post('/update/{adsID}', [MatchController::class, 'update'])->name('update');
-        Route::delete('/destroy/{adsID}', [MatchController::class, 'destroy'])->name('destroy');
-        Route::get('/join/{adsID}', [MatchController::class, 'joinForm'])->name('joinForm');
-        Route::post('/join/{adsID}', [MatchController::class, 'joinStore'])->name('joinStore');
+        Route::post('/store', [matchController::class, 'store'])->name('store');
+        Route::get('/view/{adsID}', [matchController::class, 'view'])->name('view');
+        Route::get('/edit/{adsID}', [matchController::class, 'edit'])->name('edit');
+        Route::post('/update/{adsID}', [matchController::class, 'update'])->name('update');
+        Route::delete('/destroy/{adsID}', [matchController::class, 'destroy'])->name('destroy');
+        Route::get('/join/{adsID}', [matchController::class, 'joinForm'])->name('joinForm');
+        Route::post('/join/{adsID}', [matchController::class, 'joinStore'])->name('joinStore');
     });
 
     // --- CUSTOMER: Matchmaking Application Routes ---
     Route::middleware('role:customer')->group(function () {
-        Route::post('/applications/{id}/accept', [MatchController::class, 'accept'])->name('applications.accept');
-        Route::post('/applications/{id}/reject', [MatchController::class, 'reject'])->name('applications.reject');
+        Route::post('/applications/{id}/accept', [matchController::class, 'accept'])->name('applications.accept');
+        Route::post('/applications/{id}/reject', [matchController::class, 'reject'])->name('applications.reject');
     });
 
    // --- CUSTOMER: Rating & Review Routes ---
     Route::prefix('customer/rating')->name('customer.rating.')->middleware('role:customer')->group(function () {
-        Route::get('/', [RatingController::class, 'showCustomerRatings'])->name('main');
-        Route::get('/add', [RatingController::class, 'showAddReviewForm'])->name('add');
-        Route::post('/add', [RatingController::class, 'addNewReview'])->name('store');
-        Route::get('/edit/{ratingID}', [RatingController::class, 'showEditReviewForm'])->name('edit');
-        Route::post('/update/{ratingID}', [RatingController::class, 'updateReview'])->name('update');
-        Route::get('/delete/{ratingID}', [RatingController::class, 'deleteReview'])->name('delete');
-        Route::get('/booking/{bookingID}', [RatingController::class, 'rateBooking'])->name('booking');
-        Route::get('/rental/{rentalID}', [RatingController::class, 'rateRental'])->name('rental');
-        Route::post('/store-specific', [RatingController::class, 'storeSpecificReview'])->name('store_specific');
+        Route::get('/', [ratingController::class, 'showCustomerRatings'])->name('main');
+        Route::get('/add', [ratingController::class, 'showAddReviewForm'])->name('add');
+        Route::post('/add', [ratingController::class, 'addNewReview'])->name('store');
+        Route::get('/edit/{ratingID}', [ratingController::class, 'showEditReviewForm'])->name('edit');
+        Route::post('/update/{ratingID}', [ratingController::class, 'updateReview'])->name('update');
+        Route::get('/delete/{ratingID}', [ratingController::class, 'deleteReview'])->name('delete');
+        Route::get('/booking/{bookingID}', [ratingController::class, 'rateBooking'])->name('booking');
+        Route::get('/rental/{rentalID}', [ratingController::class, 'rateRental'])->name('rental');
+        Route::post('/store-specific', [ratingController::class, 'storeSpecificReview'])->name('store_specific');
     });
 
     // --- ADMIN: Booking Routes ---
@@ -185,10 +185,10 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
     });
 
     // --- ADMIN: Rental Route ---
-    Route::get('/admin/rentals/current', [RentalController::class, 'viewCurrentAdmin'])->name('admin.rentals.current')->middleware('role:administrator');
+    Route::get('/admin/rentals/current', [rentalController::class, 'viewCurrentAdmin'])->name('admin.rentals.current')->middleware('role:administrator');
     
     // --- ADMIN: Rating & Review Routes ---
-    Route::get('/admin/ratings', [RatingController::class, 'showCustomerRatings'])->name('admin.rating.view')->middleware('role:administrator');
+    Route::get('/admin/ratings', [ratingController::class, 'showCustomerRatings'])->name('admin.rating.view')->middleware('role:administrator');
     
     // --- ADMIN: Report Routes ---
     Route::prefix('admin/reports')->name('admin.reports.')->middleware('role:administrator')->group(function () {
@@ -226,7 +226,7 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
     });
     
     // --- STAFF: Rating & Review Routes ---
-    Route::get('/staff/ratings', [RatingController::class, 'showCustomerRatings'])->name('staff.rating.view')->middleware('role:staff');
+    Route::get('/staff/ratings', [ratingController::class, 'showCustomerRatings'])->name('staff.rating.view')->middleware('role:staff');
 
     // --- STAFF: Report Routes ---
     Route::prefix('staff/reports')->name('staff.reports.')->middleware('role:staff')->group(function () {
@@ -240,17 +240,17 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
 
     // --- STAFF: Rental Routes ---
     Route::prefix('staff/rental')->name('staff.rental.')->middleware('role:staff')->group(function () {
-        Route::get('/', [RentalController::class, 'index'])->name('main');
+        Route::get('/', [rentalController::class, 'index'])->name('main');
         Route::get('/add', fn() => view('Rental.staff.addPage'))->name('add');
-        Route::post('/store', [RentalController::class, 'store'])->name('store');
-        Route::get('/edit/{itemID}', [RentalController::class, 'edit'])->name('edit');
-        Route::put('/update/{itemID}', [RentalController::class, 'update'])->name('update');
-        Route::delete('/delete/{itemID}', [RentalController::class, 'destroy'])->name('delete');
+        Route::post('/store', [rentalController::class, 'store'])->name('store');
+        Route::get('/edit/{itemID}', [rentalController::class, 'edit'])->name('edit');
+        Route::put('/update/{itemID}', [rentalController::class, 'update'])->name('update');
+        Route::delete('/delete/{itemID}', [rentalController::class, 'destroy'])->name('delete');
     });
     Route::middleware('role:staff')->group(function () {
-        Route::get('/staff/rentals/current', [RentalController::class, 'viewCurrent'])->name('staff.rentals.current');
-        Route::get('/staff/rentals/return-approval', [RentalController::class, 'viewReturnApprovals'])->name('staff.rentals.returnApproval');
-        Route::post('/staff/rentals/return-approval/{rentalID}', [RentalController::class, 'updateReturnApproval'])->name('staff.rentals.updateReturnApproval');
+        Route::get('/staff/rentals/current', [rentalController::class, 'viewCurrent'])->name('staff.rentals.current');
+        Route::get('/staff/rentals/return-approval', [rentalController::class, 'viewReturnApprovals'])->name('staff.rentals.returnApproval');
+        Route::post('/staff/rentals/return-approval/{rentalID}', [rentalController::class, 'updateReturnApproval'])->name('staff.rentals.updateReturnApproval');
     });
 
 });
