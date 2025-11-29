@@ -116,7 +116,7 @@
                                 <p class="text-xs text-gray-500">{{ $booking->formattedTime }}</p>
                             </div>
                             <div>
-                                @include('booking.customer.partials.status_badge', ['booking' => $booking])
+                                @include('Booking.customer.partials.status_badge', ['booking' => $booking])
                             </div>
                         </div>
                     </div>
@@ -196,7 +196,7 @@
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-800">
                                     Completed
                                 </span>
-                                @include('booking.customer.partials.rating_button', ['booking' => $booking])
+                                @include('Booking.customer.partials.rating_button', ['booking' => $booking])
                             </div>
                         </div>
                     </div>
