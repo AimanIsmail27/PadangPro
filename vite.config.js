@@ -8,5 +8,5 @@ export default defineConfig({
             refresh: true,
         }),
     ],
-    base: './', // ensures relative paths for production assets
+    base: process.env.APP_URL ? `${process.env.APP_URL}/build/` : '/build/',
 });
