@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\loginController;
 use App\Http\Controllers\GoogleController;
-use App\Http\Controllers\RegisterController;
+use App\Http\Controllers\registerController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController; 
@@ -54,8 +54,8 @@ Route::middleware([PreventBackHistory::class])->group(function () {
     Route::post('/login', [loginController::class, 'login'])->name('login.post');
 });
 
-Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-Route::post('/register', [RegisterController::class, 'register'])->name('register.submit');
+Route::get('/register', [registerController::class, 'showRegistrationForm'])->name('register');
+Route::post('/register', [registerController::class, 'register'])->name('register.submit');
 
 
 // =================================================================
@@ -202,8 +202,8 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
 
     // --- ADMIN: Staff Management ---
     Route::middleware('role:administrator')->group(function () {
-        Route::get('/staff/register', [RegisterController::class, 'showStaffRegistrationForm'])->name('staff.register');
-        Route::post('/register/staff', [RegisterController::class, 'registerStaff'])->name('staff.register.store');
+        Route::get('/staff/register', [registerController::class, 'showStaffRegistrationForm'])->name('staff.register');
+        Route::post('/register/staff', [registerController::class, 'registerStaff'])->name('staff.register.store');
     });
 
     // --- STAFF: Booking Routes ---
