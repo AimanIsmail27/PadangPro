@@ -64,7 +64,7 @@ class RegisterController extends Controller
             ]);
 
             DB::commit();
-            Mail::to($validated['user_Email'])->send(new WelcomeMail($validated['customer_FullName']));
+           // Mail::to($validated['user_Email'])->send(new WelcomeMail($validated['customer_FullName']));
 
 
             return redirect()->route('login')->with('success', 'Registration successful! Please login.');
@@ -126,7 +126,7 @@ class RegisterController extends Controller
                 'staff_Address' => $validated['staff_Address'],
                 'userID' => $userID,
             ]);
-            Mail::to($validated['user_Email'])
+            //Mail::to($validated['user_Email'])
                 ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
 
             $message = "Staff registered successfully! Staff ID: $staffID";
@@ -142,7 +142,7 @@ class RegisterController extends Controller
                 'admin_Address' => $validated['staff_Address'],
                 'userID' => $userID,
             ]);
-            Mail::to($validated['user_Email'])
+            //Mail::to($validated['user_Email'])
                 ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
 
             $message = "Administrator registered successfully! Admin ID: $adminID";
