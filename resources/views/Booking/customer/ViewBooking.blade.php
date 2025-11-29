@@ -89,7 +89,7 @@
                                 </td>
                                 <td class="px-6 py-5 whitespace-nowrap text-sm font-medium text-gray-800">{{ $booking->formattedPrice }}</td>
                                 <td class="px-6 py-5 whitespace-nowrap text-center">
-                                    @include('booking.customer.partials.status_badge', ['booking' => $booking])
+                                    @include('Booking.customer.partials.status_badge', ['booking' => $booking])
                                 </td>
                             </tr>
                         @endforeach
@@ -166,7 +166,7 @@
                                     </span>
                                 </td>
                                 <td class="px-6 py-5 whitespace-nowrap text-center">
-                                    @include('booking.customer.partials.rating_button', ['booking' => $booking])
+                                    @include('Booking.customer.partials.rating_button', ['booking' => $booking])
                                 </td>
                             </tr>
                         @endforeach
