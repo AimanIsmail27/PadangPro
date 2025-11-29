@@ -20,11 +20,6 @@
         }
     </style>
 </head>
-{{-- 
-    LAYOUT:
-    - Mobile: Gray background (for card contrast), Column layout
-    - Desktop: White background, Row layout (Original)
---}}
 <body class="min-h-screen flex flex-col md:flex-row bg-gray-50 md:bg-white">
 
     <div class="w-full md:w-1/2 h-80 md:h-auto combo-gradient text-white flex flex-col relative p-8 md:p-10 justify-start md:justify-start shadow-xl md:shadow-none rounded-b-[3rem] md:rounded-none z-0">
@@ -100,7 +95,7 @@
                 </div>
 
                 <a href="{{ route('login.google') }}" class="w-full border border-gray-300 bg-gray-50 text-gray-700 py-3 rounded-lg flex items-center justify-center space-x-3 hover:bg-gray-200 transition font-semibold shadow-sm">
-                    <img src="{{ asset('images/googlephoto.png') }}" alt="Google" class="w-5 h-5">    
+                    <img src="{{ secure_asset('images/googlephoto.png') }}" alt="Google" class="w-5 h-5">    
                     <span class="text-base font-medium">Continue with Google</span>
                 </a>
 
