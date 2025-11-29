@@ -253,7 +253,7 @@ public function viewBookings(Request $request)
         $this->formatBookingCollection($adminBookings->getCollection());
         $this->formatBookingCollection($customerBookings->getCollection());
         
-        return view($viewContext->path . '.viewBooking', compact('adminBookings', 'customerBookings', 'monthList', 'selectedMonth'));
+        return view($viewContext->path . '.ViewBooking', compact('adminBookings', 'customerBookings', 'monthList', 'selectedMonth'));
 
     } else {
         
