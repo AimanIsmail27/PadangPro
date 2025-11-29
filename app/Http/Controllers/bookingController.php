@@ -513,7 +513,7 @@ public function viewBookings(Request $request)
         if ($viewContext->is_admin_or_staff) {
             return redirect()->route($viewContext->user_type . '.Booking.viewAll')->with('success', 'Booking updated successfully!');
         } else {
-            return redirect()->route('Booking.confirmation', $booking->bookingID)->with('success', 'Booking updated successfully!');
+            return redirect()->route('booking.confirmation', $booking->bookingID)->with('success', 'Booking updated successfully!');
         }
     }
 
