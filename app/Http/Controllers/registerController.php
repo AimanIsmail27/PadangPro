@@ -127,7 +127,7 @@ class RegisterController extends Controller
                 'userID' => $userID,
             ]);
             //Mail::to($validated['user_Email'])
-                ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
+               // ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
 
             $message = "Staff registered successfully! Staff ID: $staffID";
         } else {
@@ -143,7 +143,7 @@ class RegisterController extends Controller
                 'userID' => $userID,
             ]);
             //Mail::to($validated['user_Email'])
-                ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
+              //  ->send(new StaffWelcomeMail($validated['staff_FullName'], $validated['user_Type']));
 
             $message = "Administrator registered successfully! Admin ID: $adminID";
         }
