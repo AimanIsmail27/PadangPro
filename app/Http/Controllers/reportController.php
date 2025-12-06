@@ -27,13 +27,13 @@ class ReportController extends Controller
             if ($userType === 'administrator') {
                 return (object)[
                     'user_type_prefix' => 'admin', // for routes like 'admin.reports.index'
-                    'view_path' => 'report.admin' // for views in 'report/admin/'
+                    'view_path' => 'Report.admin' // for views in 'report/admin/'
                 ];
             }
             if ($userType === 'staff') {
                 return (object)[
                     'user_type_prefix' => 'staff', // for routes like 'staff.reports.index'
-                    'view_path' => 'report.staff' // for views in 'report/staff/'
+                    'view_path' => 'Report.staff' // for views in 'report/staff/'
                 ];
             }
         }
@@ -41,7 +41,7 @@ class ReportController extends Controller
         // Fallback
         return (object)[
             'user_type_prefix' => 'admin',
-            'view_path' => 'report.admin'
+            'view_path' => 'Report.admin'
         ];
     }
 
@@ -69,7 +69,7 @@ class ReportController extends Controller
         $topItemsLabels = $topItemsData->pluck('item_Name'); $topItemsQuantities = $topItemsData->pluck('total_rented');
 
         // --- THIS IS THE FIX: Return the correct view based on role ---
-        return view($viewContext->view_path . '.mainReportPage', [
+        return view($viewContext->view_path . '.MainReportPage', [
             'kpi_revenue' => $kpi_revenue,
             'kpi_bookings' => $kpi_bookings,
             'kpi_rental_revenue' => $kpi_rental_revenue,
@@ -82,7 +82,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Show the form for creating a new custom report.
+     * Show the form for creating a new custom Report.
      */
     public function create(Request $request)
     {
