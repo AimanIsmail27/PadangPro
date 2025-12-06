@@ -135,22 +135,51 @@ class RentalController extends Controller
     }
 
     public function destroy($itemID)
-    {
-        $isActive = Rental::where('itemID', $itemID)->whereIn('rental_Status', ['paid', 'pending'])->exists();
+{
+    try {
+
+        // 1. Check active rentals
+        $isActive = Rental::where('itemID', $itemID)
+            ->whereIn('rental_Status', ['paid', 'pending'])
+            ->exists();
+
         if ($isActive) {
-            return response()->json(['success' => false, 'message' => 'Cannot delete item with active rentals.'], 400);
-        }
-        
-        $item = Item::where('itemID', $itemID)->firstOrFail();
-        
-        if ($item->item_Image && Storage::disk('public')->exists($item->item_Image)) {
-            Storage::disk('public')->delete($item->item_Image);
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete item with active rentals.'
+            ], 400);
         }
 
+        // 2. Get the item
+        $item = Item::where('itemID', $itemID)->firstOrFail();
+
+        // 3. Safely delete item image (avoid error if not found)
+        if ($item->item_Image) {
+            $imagePath = 'items/' . basename($item->item_Image);
+
+            if (Storage::disk('public')->exists($imagePath)) {
+                Storage::disk('public')->delete($imagePath);
+            }
+        }
+
+        // 4. Delete DB record
         $item->delete();
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Item deleted successfully.'
+        ], 200);
+
+    } catch (\Exception $e) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Delete failed.',
+            'error' => $e->getMessage(),
+        ], 400);
     }
+}
+
 
     public function viewReturnApprovals()
     {
