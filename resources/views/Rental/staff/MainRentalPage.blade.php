@@ -185,9 +185,11 @@ document.querySelectorAll('.delete-btn').forEach(button => {
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
-                axios.delete("{{ url('staff/rental/delete') }}/" + itemID, {
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                axios({
+                    method: 'delete',
+                    url: "{{ url('staff/rental/delete') }}/" + itemID,
+                    data: {
+                        _token: "{{ csrf_token() }}"
                     }
                 })
                 .then(response => {
