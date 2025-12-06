@@ -511,7 +511,7 @@ public function viewBookings(Request $request)
         ]);
 
         if ($viewContext->is_admin_or_staff) {
-            return redirect()->route($viewContext->user_type . '.Booking.viewAll')->with('success', 'Booking updated successfully!');
+            return redirect()->route($viewContext->user_type . '.booking.viewAll')->with('success', 'Booking updated successfully!');
         } else {
             return redirect()->route('booking.confirmation', $booking->bookingID)->with('success', 'Booking updated successfully!');
         }
@@ -531,7 +531,7 @@ public function viewBookings(Request $request)
 
 
         if ($viewContext->is_admin_or_staff) {
-            $redirectRoute = $viewContext->user_type . '.Booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
+            $redirectRoute = $viewContext->user_type . '.booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
         } else {
             $redirectRoute = 'customer.dashboard'; // Customers go to their main dashboard
         }
