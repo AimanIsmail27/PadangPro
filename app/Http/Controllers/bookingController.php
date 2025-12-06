@@ -156,7 +156,7 @@ class BookingController extends Controller
         if ($viewContext->is_admin_or_staff) {
             $userID = session('user_id');
             $bookingStatus = 'paid'; 
-            $redirectRoute = $viewContext->user_type . '.Booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
+            $redirectRoute = $viewContext->user_type . '.booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
         } else {
             $userID = session('user_id');
             $bookingStatus = 'pending';
