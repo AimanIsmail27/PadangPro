@@ -134,51 +134,59 @@ class RentalController extends Controller
         return redirect()->route($viewContext->user_type . '.rental.main')->with('success', 'Item updated successfully!');
     }
 
-    public function destroy($itemID)
-{
-    try {
-
-        // 1. Check active rentals
-        $isActive = Rental::where('itemID', $itemID)
-            ->whereIn('rental_Status', ['paid', 'pending'])
-            ->exists();
-
-        if ($isActive) {
+   public function destroy($itemID)
+    {
+        try {
+            // Check if item has active rentals
+            $isActive = Rental::where('itemID', $itemID)
+                ->whereIn('rental_Status', ['paid', 'pending'])
+                ->exists();
+    
+            if ($isActive) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete item with active rentals.'
+                ], 400);
+            }
+    
+            // Find the item
+            $item = Item::where('itemID', $itemID)->firstOrFail();
+    
+            // Attempt to delete the image if exists
+            if ($item->item_Image) {
+                $imagePath = $item->item_Image;
+    
+                // Ensure the path is relative to storage/app/public
+                if (Storage::disk('public')->exists($imagePath)) {
+                    Storage::disk('public')->delete($imagePath);
+                } else {
+                    \Log::warning("Item image not found or path invalid: $imagePath");
+                }
+            }
+    
+            // Delete the item record
+            $item->delete();
+    
+            return response()->json([
+                'success' => true,
+                'message' => 'Item deleted successfully.'
+            ], 200);
+    
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete item with active rentals.'
+                'message' => 'Item not found.'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error("Failed to delete item $itemID: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete item.',
+                'error' => $e->getMessage()
             ], 400);
         }
-
-        // 2. Get the item
-        $item = Item::where('itemID', $itemID)->firstOrFail();
-
-        // 3. Safely delete item image (avoid error if not found)
-        if ($item->item_Image) {
-            $imagePath = 'items/' . basename($item->item_Image);
-
-            if (Storage::disk('public')->exists($imagePath)) {
-                Storage::disk('public')->delete($imagePath);
-            }
-        }
-
-        // 4. Delete DB record
-        $item->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Item deleted successfully.'
-        ], 200);
-
-    } catch (\Exception $e) {
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Delete failed.',
-            'error' => $e->getMessage(),
-        ], 400);
     }
-}
+
 
 
     public function viewReturnApprovals()
