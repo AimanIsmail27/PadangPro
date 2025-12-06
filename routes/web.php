@@ -10,7 +10,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\rentalController;
 use App\Http\Controllers\matchController;
 use App\Http\Controllers\ratingController;
-use App\Http\Controllers\ReportController; 
+use App\Http\Controllers\reportController; 
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\AuthSession;
 
@@ -192,12 +192,12 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
     
     // --- ADMIN: Report Routes ---
     Route::prefix('admin/reports')->name('admin.reports.')->middleware('role:administrator')->group(function () {
-        Route::get('/', [ReportController::class, 'index'])->name('index');
-        Route::get('/create', [ReportController::class, 'create'])->name('create');
-        Route::get('/show', [ReportController::class, 'show'])->name('show');
-        Route::post('/publish', [ReportController::class, 'publish'])->name('publish');
-        Route::get('/published', [ReportController::class, 'publishedList'])->name('published');
-        Route::get('/forecast', [ReportController::class, 'getBookingForecast'])->name('forecast');
+        Route::get('/', [reportController::class, 'index'])->name('index');
+        Route::get('/create', [reportController::class, 'create'])->name('create');
+        Route::get('/show', [reportController::class, 'show'])->name('show');
+        Route::post('/publish', [reportController::class, 'publish'])->name('publish');
+        Route::get('/published', [reportController::class, 'publishedList'])->name('published');
+        Route::get('/forecast', [reportController::class, 'getBookingForecast'])->name('forecast');
     });
 
     // --- ADMIN: Staff Management ---
@@ -230,12 +230,12 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
 
     // --- STAFF: Report Routes ---
     Route::prefix('staff/reports')->name('staff.reports.')->middleware('role:staff')->group(function () {
-        Route::get('/', [ReportController::class, 'index'])->name('index');
-        Route::get('/create', [ReportController::class, 'create'])->name('create');
-        Route::get('/show', [ReportController::class, 'show'])->name('show');
-        Route::post('/publish', [ReportController::class, 'publish'])->name('publish');
-        Route::get('/published', [ReportController::class, 'publishedList'])->name('published');
-        Route::get('/forecast', [ReportController::class, 'getBookingForecast'])->name('forecast');
+        Route::get('/', [reportController::class, 'index'])->name('index');
+        Route::get('/create', [reportController::class, 'create'])->name('create');
+        Route::get('/show', [reportController::class, 'show'])->name('show');
+        Route::post('/publish', [reportController::class, 'publish'])->name('publish');
+        Route::get('/published', [reportController::class, 'publishedList'])->name('published');
+        Route::get('/forecast', [reportController::class, 'getBookingForecast'])->name('forecast');
     });
 
     // --- STAFF: Rental Routes ---
