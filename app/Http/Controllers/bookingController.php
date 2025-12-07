@@ -175,6 +175,19 @@ class BookingController extends Controller
             'userID' => $userID,
             'booking_CreatedAt' => now(),
         ]);
+
+          if ($viewContext->is_admin_or_staff) {
+        
+                // Get field price
+                $field = Field::where('fieldID', $request->fieldID)->first();
+        
+                // Calculate deposit (EDIT if needed)
+                $depositAmount = $field->field_Price * 0.2;
+        
+                // Record deposit payment
+                app(\App\Http\Controllers\PaymentController::class)
+                    ->recordDeposit($bookingID, $depositAmount, 'cash');
+            }
         
         if ($viewContext->is_admin_or_staff) {
             return redirect()->route($redirectRoute)->with('success', 'Walk-in booking created successfully!');
