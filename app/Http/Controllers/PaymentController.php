@@ -615,6 +615,23 @@ public function rentalPaymentCallback(Request $request)
         }
     }
 
+        public function recordDeposit($bookingID, $depositAmount, $method = 'cash')
+        {
+            try {
+                Payment::create([
+                    'bookingID' => $bookingID,
+                    'amount_paid' => $depositAmount,
+                    'payment_type' => 'deposit',
+                    'payment_method' => $method,
+                    'payment_status' => 'paid',
+                ]);
+        
+                return true;
+            } catch (\Exception $e) {
+                \Log::error('Failed to record deposit: ' . $e->getMessage());
+                return false;
+            }
+        }
 
 
 }
