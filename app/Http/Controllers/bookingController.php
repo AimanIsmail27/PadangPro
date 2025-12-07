@@ -186,7 +186,7 @@ class BookingController extends Controller
     
             if ($field) {
                 // Calculate deposit (20% of field price)
-                $depositAmount = $slot->slot_Price * 0.2;
+                 $depositAmount = $booking->slot->slot_Price * 0.2;
     
                 // Record deposit payment as cash
                 app(\App\Http\Controllers\PaymentController::class)
