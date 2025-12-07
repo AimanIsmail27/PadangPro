@@ -128,12 +128,12 @@ class BookingController extends Controller
         return view($viewContext->path . '.addPage', compact('slot', 'field'));
     }
 
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $viewContext = $this->getViewContext();
         $bookingID = 'BOOK' . uniqid();
-
-        // Availability Check ...
+    
+        // 1. Availability Check for the slot
         $isBooked = Booking::where('slotID', $request->slotID)
             ->where(function ($q) {
                 $q->whereIn('booking_Status', ['paid', 'confirmed', 'completed'])
@@ -142,27 +142,30 @@ class BookingController extends Controller
                          ->where('booking_CreatedAt', '>=', now()->subMinutes(10));
                   });
             })->exists();
-            
+    
         if ($isBooked) {
-             return redirect()->back()->with('error', 'This slot has already been booked.');
+            return redirect()->back()->with('error', 'This slot has already been booked.');
         }
-
+    
+        // 2. Validate input
         $request->validate([
             'booking_Name' => 'required',
             'booking_Email' => 'required|email',
             'booking_PhoneNumber' => 'required',
         ]);
-
+    
+        // 3. Determine booking status and redirect route based on user type
         if ($viewContext->is_admin_or_staff) {
             $userID = session('user_id');
             $bookingStatus = 'paid'; 
-            $redirectRoute = $viewContext->user_type . '.booking.viewAll'; // 'admin.booking.viewAll' or 'staff.booking.viewAll'
+            $redirectRoute = $viewContext->user_type . '.booking.viewAll';
         } else {
             $userID = session('user_id');
             $bookingStatus = 'pending';
             $redirectRoute = 'booking.confirmation';
         }
-
+    
+        // 4. Create the booking record
         $booking = Booking::create([
             'bookingID' => $bookingID,
             'booking_Name' => $request->booking_Name,
@@ -175,26 +178,30 @@ class BookingController extends Controller
             'userID' => $userID,
             'booking_CreatedAt' => now(),
         ]);
-
-          if ($viewContext->is_admin_or_staff) {
-        
-                // Get field price
-                $field = Field::where('fieldID', $request->fieldID)->first();
-        
-                // Calculate deposit (EDIT if needed)
+    
+        // 5. If admin/staff: record deposit payment automatically
+        if ($viewContext->is_admin_or_staff) {
+            // Get field price
+            $field = Field::where('fieldID', $request->fieldID)->first();
+    
+            if ($field) {
+                // Calculate deposit (20% of field price)
                 $depositAmount = $field->field_Price * 0.2;
-        
-                // Record deposit payment
+    
+                // Record deposit payment as cash
                 app(\App\Http\Controllers\PaymentController::class)
                     ->recordDeposit($bookingID, $depositAmount, 'cash');
             }
-        
-        if ($viewContext->is_admin_or_staff) {
-            return redirect()->route($redirectRoute)->with('success', 'Walk-in booking created successfully!');
         }
-
+    
+        // 6. Redirect user accordingly
+        if ($viewContext->is_admin_or_staff) {
+            return redirect()->route($redirectRoute)->with('success', 'Walk-in booking created successfully and deposit recorded!');
+        }
+    
         return redirect()->route($redirectRoute, $booking->bookingID);
     }
+
     
    // In app/Http/Controllers/BookingController.php
 
