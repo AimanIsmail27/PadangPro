@@ -618,20 +618,29 @@ public function rentalPaymentCallback(Request $request)
         public function recordDeposit($bookingID, $depositAmount, $method = 'cash')
         {
             try {
+                // If your payments table has a paymentID column, include this:
+                $paymentID = 'PAY' . uniqid();
+        
                 Payment::create([
-                    'bookingID' => $bookingID,
-                    'amount_paid' => $depositAmount,
-                    'payment_type' => 'deposit',
-                    'payment_method' => $method,
-                    'payment_status' => 'paid',
+                    'paymentID'       => $paymentID,      // remove this line if your table doesn't have paymentID
+                    'bookingID'       => $bookingID,
+                    'amount_paid'     => $depositAmount,
+                    'payment_type'    => 'deposit',       // deposit / balance / full
+                    'payment_method'  => $method,         // cash / toyyibpay / online
+                    'payment_status'  => 'paid',          // paid because walk-in deposit is cash
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
                 ]);
         
                 return true;
+        
             } catch (\Exception $e) {
+        
                 \Log::error('Failed to record deposit: ' . $e->getMessage());
                 return false;
             }
         }
+
 
 
 }
