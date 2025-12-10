@@ -641,7 +641,7 @@ public function rentalPaymentCallback(Request $request)
                 'paymentID'        => 'PAY' . uniqid(),
                 'payer_Name'       => $booking->booking_Name,
                 'payment_Amount'   => $depositAmount,
-                'payment_Status'   => 'paid_deposit', // match your naming convention
+                'payment_Status'   => 'paid', // match your naming convention
                 'bookingID'        => $booking->bookingID,
                 'userID'           => $booking->userID,
                 'payer_BankAccount'=> strtoupper($method) === 'CASH' ? 'CASH_AT_COUNTER' : null,
