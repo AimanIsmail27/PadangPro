@@ -16,7 +16,7 @@ class Payment extends Model
     protected $primaryKey = 'paymentID';
 
     // Disable timestamps
-    public $timestamps = false;
+    public $timestamps = true;
 
     // Columns that can be mass assigned
     protected $fillable = [
