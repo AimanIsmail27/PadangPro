@@ -308,7 +308,8 @@ public function viewBookings(Request $request)
             ->join('slot', 'booking.slotID', '=', 'slot.slotID')
             ->whereYear('slot.slot_Date', $year)
             ->whereMonth('slot.slot_Date', $month)
-            ->select('booking.*')
+            ->select('booking.*') 
+            
             ->orderBy('slot.slot_Date', 'asc')
             ->orderBy('slot.slot_Time', 'asc');
 
