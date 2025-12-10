@@ -415,7 +415,7 @@ public function rentalPaymentCallback(Request $request)
                 'payment_Status'  => 'paid_balance (cash)', // Special status for cash
                 'bookingID'       => $booking->bookingID,
                 'userID'          => $booking->userID,
-                'payer_BankAccount' => 'CASH_AT_COUNTER' // Record how it was paid
+                'payer_BankAccount' => 'CASH_AT_COUNTER', // Record how it was paid
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ]);
@@ -612,7 +612,7 @@ public function rentalPaymentCallback(Request $request)
                 'payment_Status'  => 'paid_balance (cash)', // Special status for cash
                 'rentalID'        => $rental->rentalID,
                 'userID'          => $rental->userID,
-                'payer_BankAccount' => 'CASH_AT_COUNTER' // Record how it was paid
+                'payer_BankAccount' => 'CASH_AT_COUNTER', // Record how it was paid
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ]);
