@@ -63,7 +63,7 @@ class PaymentController extends Controller
             'bookingID'       => $booking->bookingID,
             'userID'          => $booking->userID,
             'created_at'      => now(),
-            'updated_at'      => now()
+            'updated_at'      => now(),
         ]);
 
         // --- CHANGE 3: Redirect user to the DEV ToyyibPay URL ---
@@ -190,7 +190,7 @@ public function createRentalPayment(Request $request, $rentalID)
         'rentalID'          => $rental->rentalID,
         'userID'            => $rental->userID,
         'created_at'        => now(),
-        'updated_at'        => now()
+        'updated_at'        => now(),
     ]);
 
     // Redirect to dev ToyyibPay payment page
@@ -296,7 +296,7 @@ public function rentalPaymentCallback(Request $request)
             'bookingID'       => $booking->bookingID,
             'userID'          => $booking->userID,
             'created_at'      => now(),
-            'updated_at'      => now()
+            'updated_at'      => now(),
         ]);
 
         // 4. Redirect to payment page
@@ -417,7 +417,7 @@ public function rentalPaymentCallback(Request $request)
                 'userID'          => $booking->userID,
                 'payer_BankAccount' => 'CASH_AT_COUNTER' // Record how it was paid
                 'created_at'        => now(),
-                'updated_at'        => now()
+                'updated_at'        => now(),
             ]);
             
             $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
@@ -492,7 +492,7 @@ public function rentalPaymentCallback(Request $request)
             'rentalID'        => $rental->rentalID,
             'userID'          => $rental->userID,
             'created_at'      => now(),
-            'updated_at'      => now()
+            'updated_at'      => now(),
         ]);
 
         return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $bill['BillCode']);
@@ -614,7 +614,7 @@ public function rentalPaymentCallback(Request $request)
                 'userID'          => $rental->userID,
                 'payer_BankAccount' => 'CASH_AT_COUNTER' // Record how it was paid
                 'created_at'        => now(),
-                'updated_at'        => now()
+                'updated_at'        => now(),
             ]);
             
             // Redirect back to the previous page (works for both Admin and Staff views)
@@ -646,7 +646,7 @@ public function rentalPaymentCallback(Request $request)
                 'userID'           => $booking->userID,
                 'payer_BankAccount'=> strtoupper($method) === 'CASH' ? 'CASH_AT_COUNTER' : null,
                 'created_at'        => now(),
-                'updated_at'        => now()
+                'updated_at'        => now(),
             ]);
     
             return true;
