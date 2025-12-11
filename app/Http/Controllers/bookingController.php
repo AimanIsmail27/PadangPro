@@ -278,7 +278,8 @@ public function viewBookings(Request $request)
     } else {
         
         // --- CUSTOMER LOGIC (This was already correct) ---
-        
+        $userId = session('user_id');
+        $userEmail = session('user_email') 
         // 1. Generate month list (past and future)
         $monthList = [];
         for ($i = 6; $i >= 0; $i--) { // Past 6 months
@@ -298,13 +299,16 @@ public function viewBookings(Request $request)
 
         // 3. --- QUERY 1: PENDING & AWAITING BALANCE BOOKINGS ---
         $pendingBookingsQuery = Booking::with(['slot', 'field'])
-            ->where('booking.userID', session('user_id'))
-            ->whereIn('booking.booking_Status', ['paid']) // Get pending and deposit-paid
+            ->where(function ($q) use ($userId, $userEmail) {
+                $q->where('booking.userID', $userId)
+                  ->orWhere('booking.booking_Email', $userEmail);
+            })
+            ->whereIn('booking.booking_Status', ['paid'])
             ->join('slot', 'booking.slotID', '=', 'slot.slotID')
             ->whereYear('slot.slot_Date', $year)
             ->whereMonth('slot.slot_Date', $month)
             ->select('booking.*')
-            ->orderBy('slot.slot_Date', 'asc') 
+            ->orderBy('slot.slot_Date', 'asc')
             ->orderBy('slot.slot_Time', 'asc');
 
         $pendingBookings = $pendingBookingsQuery->paginate(5, ['*'], 'pending_page')->appends($request->query());
@@ -313,13 +317,16 @@ public function viewBookings(Request $request)
 
         // 4. --- QUERY 2: COMPLETED BOOKINGS ---
         $completedBookingsQuery = Booking::with(['slot', 'field'])
-            ->where('booking.userID', session('user_id'))
-            ->where('booking.booking_Status', 'completed') // 'completed' = Full balance paid
+            ->where(function ($q) use ($userId, $userEmail) {
+                $q->where('booking.userID', $userId)
+                  ->orWhere('booking.booking_Email', $userEmail);
+            })
+            ->where('booking.booking_Status', 'completed')
             ->join('slot', 'booking.slotID', '=', 'slot.slotID')
             ->whereYear('slot.slot_Date', $year)
             ->whereMonth('slot.slot_Date', $month)
             ->select('booking.*')
-            ->orderBy('slot.slot_Date', 'desc') 
+            ->orderBy('slot.slot_Date', 'desc')
             ->orderBy('slot.slot_Time', 'desc');
 
 
