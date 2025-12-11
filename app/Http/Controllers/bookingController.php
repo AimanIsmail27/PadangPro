@@ -297,22 +297,15 @@ public function viewBookings(Request $request)
         $today = Carbon::now('Asia/Kuala_Lumpur')->startOfDay();
 
         // 3. --- QUERY 1: PENDING & AWAITING BALANCE BOOKINGS ---
-        $customerEmail = session('user_email');
-
         $pendingBookingsQuery = Booking::with(['slot', 'field'])
-            ->where(function ($query) use ($customerEmail) {
-                $query->where('booking.userID', session('user_id')) // normal bookings
-                      ->orWhere('booking.booking_Email', $customerEmail); // include walk-ins
-            })
-            ->whereIn('booking.booking_Status', ['paid']) // deposit paid
+            ->where('booking.userID', session('user_id'))
+            ->whereIn('booking.booking_Status', ['paid']) // Get pending and deposit-paid
             ->join('slot', 'booking.slotID', '=', 'slot.slotID')
             ->whereYear('slot.slot_Date', $year)
             ->whereMonth('slot.slot_Date', $month)
-            ->select('booking.*') 
-            
-            ->orderBy('slot.slot_Date', 'asc')
+            ->select('booking.*')
+            ->orderBy('slot.slot_Date', 'asc') 
             ->orderBy('slot.slot_Time', 'asc');
-
 
         $pendingBookings = $pendingBookingsQuery->paginate(5, ['*'], 'pending_page')->appends($request->query());
         $this->formatBookingCollection($pendingBookings->getCollection());
@@ -320,17 +313,14 @@ public function viewBookings(Request $request)
 
         // 4. --- QUERY 2: COMPLETED BOOKINGS ---
         $completedBookingsQuery = Booking::with(['slot', 'field'])
-        ->where(function ($query) use ($customerEmail) {
-            $query->where('booking.userID', session('user_id'))
-                  ->orWhere('booking.booking_Email', $customerEmail);
-        })
-        ->where('booking.booking_Status', 'completed')
-        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
-        ->whereYear('slot.slot_Date', $year)
-        ->whereMonth('slot.slot_Date', $month)
-        ->select('booking.*')
-        ->orderBy('slot.slot_Date', 'desc')
-        ->orderBy('slot.slot_Time', 'desc');
+            ->where('booking.userID', session('user_id'))
+            ->where('booking.booking_Status', 'completed') // 'completed' = Full balance paid
+            ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+            ->whereYear('slot.slot_Date', $year)
+            ->whereMonth('slot.slot_Date', $month)
+            ->select('booking.*')
+            ->orderBy('slot.slot_Date', 'desc') 
+            ->orderBy('slot.slot_Time', 'desc');
 
 
         $completedBookings = $completedBookingsQuery->paginate(5, ['*'], 'completed_page')->appends($request->query());
