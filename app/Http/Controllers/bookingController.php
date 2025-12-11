@@ -279,7 +279,7 @@ public function viewBookings(Request $request)
         
         // --- CUSTOMER LOGIC (This was already correct) ---
         $userId = session('user_id');
-        $userEmail = session('user_email') 
+        $userEmail = session('user_email'); 
         // 1. Generate month list (past and future)
         $monthList = [];
         for ($i = 6; $i >= 0; $i--) { // Past 6 months
