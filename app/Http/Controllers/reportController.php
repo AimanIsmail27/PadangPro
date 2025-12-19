@@ -49,37 +49,128 @@ class ReportController extends Controller
      * Display the main report dashboard (KPIs and automated charts ONLY).
      */
     public function index()
-    {
-        $viewContext = $this->getViewContext(); // Get user context
-        $now = Carbon::now('Asia/Kuala_Lumpur');
+{
+    $viewContext = $this->getViewContext();
+    $now = Carbon::now('Asia/Kuala_Lumpur');
 
-        // --- Part 1: KPIs for the Current Month ---
-        $kpi_revenue = Booking::where('booking.booking_Status', 'paid')->whereYear('booking.booking_CreatedAt', $now->year)->whereMonth('booking.booking_CreatedAt', $now->month)->join('slot', 'booking.slotID', '=', 'slot.slotID')->sum('slot.slot_Price');
-        $kpi_bookings = Booking::where('booking_Status', 'paid')->whereYear('booking_CreatedAt', $now->year)->whereMonth('booking_CreatedAt', $now->month)->count();
-        $kpi_rental_revenue = Rental::where('rental.rental_Status', 'paid')->whereYear('rental.rental_StartDate', $now->year)->whereMonth('rental.rental_StartDate', $now->month)->join('item', 'rental.itemID', '=', 'item.itemID')->select(DB::raw('SUM(rental.quantity * item.item_Price * (DATEDIFF(rental.rental_EndDate, rental.rental_StartDate) + 1)) as total'))->value('total') ?? 0;
-        $kpi_items_rented = Rental::where('rental_Status', 'paid')->whereYear('rental_StartDate', $now->year)->whereMonth('rental_StartDate', $now->month)->sum('quantity');
+    /*
+    |--------------------------------------------------------------------------
+    | PART 1: KPIs (CURRENT MONTH)
+    |--------------------------------------------------------------------------
+    */
 
-        // --- Part 2: Automated Charts ---
-        $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
-        $monthlyRevenueData = Booking::where('booking.booking_Status', 'paid')->where('booking.booking_CreatedAt', '>=', $sixMonthsAgo)->join('slot', 'booking.slotID', '=', 'slot.slotID')->select(DB::raw('SUM(slot.slot_Price) as total_revenue'), DB::raw('DATE_FORMAT(booking.booking_CreatedAt, "%Y-%m") as month'))->groupBy('month')->orderBy('month', 'asc')->get();
-        $chartLabels = []; $chartData = [];
-        for ($i = 0; $i < 6; $i++) { $period = $now->copy()->subMonths(5 - $i); $monthKey = $period->format('Y-m'); $chartLabels[] = $period->format('M Y'); $monthData = $monthlyRevenueData->firstWhere('month', $monthKey); $chartData[] = $monthData ? $monthData->total_revenue : 0; }
+    // ✅ 1. BOOKING REVENUE (FROM PAYMENT TABLE)
+    $kpi_revenue = Payment::whereNotNull('payment.bookingID')
+        ->whereIn('payment.payment_Status', [
+            'paid',
+            'paid_balance',
+            'paid_balance (cash)'
+        ])
+        ->whereYear('payment.created_at', $now->year)
+        ->whereMonth('payment.created_at', $now->month)
+        ->sum('payment.payment_Amount');
 
-        $topItemsData = Rental::where('rental.rental_Status', 'paid')->where('rental.rental_StartDate', '>=', $now->copy()->subDays(90))->join('item', 'rental.itemID', '=', 'item.itemID')->select('item.item_Name', DB::raw('SUM(rental.quantity) as total_rented'))->groupBy('item.itemID', 'item.item_Name')->orderBy('total_rented', 'desc')->limit(5)->get();
-        $topItemsLabels = $topItemsData->pluck('item_Name'); $topItemsQuantities = $topItemsData->pluck('total_rented');
+    // ✅ 2. TOTAL BOOKINGS (FULLY PAID BOOKINGS)
+    $kpi_bookings = Booking::where('booking_Status', 'completed')
+        ->whereYear('booking_CreatedAt', $now->year)
+        ->whereMonth('booking_CreatedAt', $now->month)
+        ->count();
 
-        // --- THIS IS THE FIX: Return the correct view based on role ---
-        return view($viewContext->view_path . '.MainReportPage', [
-            'kpi_revenue' => $kpi_revenue,
-            'kpi_bookings' => $kpi_bookings,
-            'kpi_rental_revenue' => $kpi_rental_revenue,
-            'kpi_items_rented' => $kpi_items_rented,
-            'chartLabels' => json_encode($chartLabels),
-            'chartData' => json_encode($chartData),
-            'topItemsLabels' => json_encode($topItemsLabels),
-            'topItemsQuantities' => json_encode($topItemsQuantities),
-        ]);
+    // ✅ 3. RENTAL REVENUE (UNCHANGED – ALREADY CORRECT)
+    $kpi_rental_revenue = Rental::where('rental.rental_Status', 'paid')
+        ->whereYear('rental.rental_StartDate', $now->year)
+        ->whereMonth('rental.rental_StartDate', $now->month)
+        ->join('item', 'rental.itemID', '=', 'item.itemID')
+        ->select(DB::raw(
+            'SUM(
+                rental.quantity * 
+                item.item_Price * 
+                (DATEDIFF(rental.rental_EndDate, rental.rental_StartDate) + 1)
+            ) as total'
+        ))
+        ->value('total') ?? 0;
+
+    // ✅ 4. TOTAL ITEMS RENTED
+    $kpi_items_rented = Rental::where('rental_Status', 'paid')
+        ->whereYear('rental_StartDate', $now->year)
+        ->whereMonth('rental_StartDate', $now->month)
+        ->sum('quantity');
+
+    /*
+    |--------------------------------------------------------------------------
+    | PART 2: MONTHLY BOOKING REVENUE CHART (LAST 6 MONTHS)
+    |--------------------------------------------------------------------------
+    */
+
+    $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
+
+    $monthlyRevenueData = Payment::whereNotNull('payment.bookingID')
+        ->whereIn('payment.payment_Status', [
+            'paid',
+            'paid_balance',
+            'paid_balance (cash)'
+        ])
+        ->where('payment.created_at', '>=', $sixMonthsAgo)
+        ->select(
+            DB::raw('SUM(payment.payment_Amount) as total_revenue'),
+            DB::raw('DATE_FORMAT(payment.created_at, "%Y-%m") as month')
+        )
+        ->groupBy('month')
+        ->orderBy('month', 'asc')
+        ->get();
+
+    $chartLabels = [];
+    $chartData = [];
+
+    for ($i = 0; $i < 6; $i++) {
+        $period = $now->copy()->subMonths(5 - $i);
+        $monthKey = $period->format('Y-m');
+
+        $chartLabels[] = $period->format('M Y');
+
+        $monthData = $monthlyRevenueData->firstWhere('month', $monthKey);
+        $chartData[] = $monthData ? (float) $monthData->total_revenue : 0;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PART 3: TOP RENTED ITEMS (LAST 90 DAYS)
+    |--------------------------------------------------------------------------
+    */
+
+    $topItemsData = Rental::where('rental.rental_Status', 'paid')
+        ->where('rental.rental_StartDate', '>=', $now->copy()->subDays(90))
+        ->join('item', 'rental.itemID', '=', 'item.itemID')
+        ->select(
+            'item.item_Name',
+            DB::raw('SUM(rental.quantity) as total_rented')
+        )
+        ->groupBy('item.itemID', 'item.item_Name')
+        ->orderBy('total_rented', 'desc')
+        ->limit(5)
+        ->get();
+
+    $topItemsLabels = $topItemsData->pluck('item_Name');
+    $topItemsQuantities = $topItemsData->pluck('total_rented');
+
+    /*
+    |--------------------------------------------------------------------------
+    | RETURN VIEW
+    |--------------------------------------------------------------------------
+    */
+
+    return view($viewContext->view_path . '.MainReportPage', [
+        'kpi_revenue' => $kpi_revenue,
+        'kpi_bookings' => $kpi_bookings,
+        'kpi_rental_revenue' => $kpi_rental_revenue,
+        'kpi_items_rented' => $kpi_items_rented,
+        'chartLabels' => json_encode($chartLabels),
+        'chartData' => json_encode($chartData),
+        'topItemsLabels' => json_encode($topItemsLabels),
+        'topItemsQuantities' => json_encode($topItemsQuantities),
+    ]);
+}
+
 
     /**
      * Show the form for creating a new custom Report.
