@@ -9,6 +9,7 @@ use App\Models\Field;
 use App\Models\Item;
 use App\Models\Slot;
 use App\Models\Report;
+use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
