@@ -182,6 +182,8 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
         Route::put('/{bookingID}', [bookingController::class, 'update'])->name('update');
         Route::delete('/{bookingID}/cancel', [bookingController::class, 'destroy'])->name('cancel');
         Route::get('/{fieldID}/slots-json', [bookingController::class, 'getSlotsJson'])->name('slots.json');
+        Route::post('/{bookingID}/mark-completed', [PaymentController::class, 'markAsCompleted'])
+        ->name('payment.markCompleted');
     });
 
     // --- ADMIN: Rental Route ---

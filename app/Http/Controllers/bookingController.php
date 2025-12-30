@@ -205,143 +205,175 @@ class BookingController extends Controller
     
    // In app/Http/Controllers/BookingController.php
 
-public function viewBookings(Request $request)
+    public function viewBookings(Request $request)
 {
     $viewContext = $this->getViewContext();
     $now = Carbon::now('Asia/Kuala_Lumpur');
 
     if ($viewContext->is_admin_or_staff) {
-        
-        // --- ADMIN/STAFF LOGIC (WITH SEARCH FIX) ---
-        
-        // 1. Get Month List (for dropdown)
+
+        // --- ADMIN/STAFF LOGIC ---
+
+        // 1. Get Month List (PAST + FUTURE)
         $monthList = [];
-        for ($i = 0; $i <= 12; $i++) {
+
+        for ($i = 6; $i >= 0; $i--) {
             $date = $now->copy()->subMonths($i);
             $monthList[$date->format('Y-m')] = $date->format('F Y');
         }
-        
-        // 2. Get Filters
-        $selectedMonth = $request->input('month', $now->format('Y-m'));
-        $searchDate = $request->input('search_date');
 
-        // --- Query 1: Admin/Staff Bookings ---
-        $adminQuery = Booking::whereHas('user', function ($query) {
-            $query->whereIn('user_Type', ['administrator', 'staff']);
-        })
-        ->with(['slot', 'field', 'user'])
-        ->where('booking_Status', 'paid');
-
-        // --- Query 2: Customer Bookings ---
-        $customerQuery = Booking::whereHas('user', function ($query) {
-            $query->where('user_Type', 'customer');
-        })
-        ->with(['slot', 'field', 'user'])
-        ->whereIn('booking_Status', ['paid', 'completed']);
-
-        // 3. APPLY FILTERS
-        if ($searchDate) {
-            // If searching by date, join 'slot' and filter by 'slot_Date'
-            // This search will be for the DATE OF THE EVENT
-            $adminQuery->join('slot', 'booking.slotID', '=', 'slot.slotID')
-                       ->whereDate('slot.slot_Date', $searchDate)
-                       ->select('booking.*'); // Avoid column conflicts
-
-            $customerQuery->join('slot', 'booking.slotID', '=', 'slot.slotID')
-                          ->whereDate('slot.slot_Date', $searchDate)
-                          ->select('booking.*'); // Avoid column conflicts
-            
-            // Set selectedMonth to null so the dropdown doesn't show a confusing value
-            $selectedMonth = null; 
-        } else {
-            // If not searching, use the month filter based on 'booking_CreatedAt'
-            $year = Carbon::parse($selectedMonth)->year;
-            $month = Carbon::parse($selectedMonth)->month;
-            
-            $adminQuery->whereYear('booking_CreatedAt', $year)
-                       ->whereMonth('booking_CreatedAt', $month);
-                       
-            $customerQuery->whereYear('booking_CreatedAt', $year)
-                          ->whereMonth('booking_CreatedAt', $month);
-        }
-
-        // 4. Execute Queries
-        $adminBookings = $adminQuery->latest('booking_CreatedAt')->paginate(5, ['*'], 'admin_page')->appends($request->query());
-        $customerBookings = $customerQuery->latest('booking_CreatedAt')->paginate(5, ['*'], 'customer_page')->appends($request->query());
-
-        // 5. Format and Return
-        $this->formatBookingCollection($adminBookings->getCollection());
-        $this->formatBookingCollection($customerBookings->getCollection());
-        
-        return view($viewContext->path . '.ViewBooking', compact('adminBookings', 'customerBookings', 'monthList', 'selectedMonth'));
-
-    } else {
-        
-        // --- CUSTOMER LOGIC (This was already correct) ---
-        $userId = session('user_id');
-        $userEmail = session('user_email'); 
-        // 1. Generate month list (past and future)
-        $monthList = [];
-        for ($i = 6; $i >= 0; $i--) { // Past 6 months
-            $date = $now->copy()->subMonths($i);
-            $monthList[$date->format('Y-m')] = $date->format('F Y');
-        }
-        for ($i = 1; $i <= 6; $i++) { // Future 6 months
+        for ($i = 1; $i <= 6; $i++) {
             $date = $now->copy()->addMonths($i);
             $monthList[$date->format('Y-m')] = $date->format('F Y');
         }
 
-        // 2. Get selected month
-        $selectedMonth = $request->input('month', $now->format('Y-m'));
-        $year = Carbon::parse($selectedMonth)->year;
-        $month = Carbon::parse($selectedMonth)->month;
-        $today = Carbon::now('Asia/Kuala_Lumpur')->startOfDay();
+        // 2. Get Filters
+        $selectedMonth  = $request->input('month', $now->format('Y-m'));
+        $searchDate     = $request->input('search_date');
+        $selectedStatus = $request->input('status', 'all');
 
-        // 3. --- QUERY 1: PENDING & AWAITING BALANCE BOOKINGS ---
+        // --- Query 1: Admin/Staff Bookings ---
+        $adminQuery = Booking::with(['slot', 'field', 'user'])
+            ->whereHas('user', function ($query) {
+                $query->whereIn('user_Type', ['administrator', 'staff']);
+            });
+
+        // --- Query 2: Customer Bookings ---
+        $customerQuery = Booking::with(['slot', 'field', 'user'])
+            ->whereHas('user', function ($query) {
+                $query->where('user_Type', 'customer');
+            });
+
+        // 3. APPLY DATE / MONTH FILTERS (✅ SLOT DATE)
+        if ($searchDate) {
+
+            $adminQuery->whereHas('slot', function ($q) use ($searchDate) {
+                $q->whereDate('slot_Date', $searchDate);
+            });
+
+            $customerQuery->whereHas('slot', function ($q) use ($searchDate) {
+                $q->whereDate('slot_Date', $searchDate);
+            });
+
+            $selectedMonth = null;
+
+        } else {
+
+            $year  = Carbon::parse($selectedMonth)->year;
+            $month = Carbon::parse($selectedMonth)->month;
+
+            $adminQuery->whereHas('slot', function ($q) use ($year, $month) {
+                $q->whereYear('slot_Date', $year)
+                  ->whereMonth('slot_Date', $month);
+            });
+
+            $customerQuery->whereHas('slot', function ($q) use ($year, $month) {
+                $q->whereYear('slot_Date', $year)
+                  ->whereMonth('slot_Date', $month);
+            });
+        }
+
+        // 4. APPLY STATUS FILTER
+        if ($selectedStatus !== 'all') {
+            $adminQuery->where('booking_Status', $selectedStatus);
+            $customerQuery->where('booking_Status', $selectedStatus);
+        } else {
+            $adminQuery->whereIn('booking_Status', ['paid', 'completed']);
+            $customerQuery->whereIn('booking_Status', ['paid', 'completed']);
+        }
+
+        // 5. Execute Queries
+        $adminBookings = $adminQuery
+            ->latest('booking_CreatedAt')
+            ->paginate(5, ['*'], 'admin_page')
+            ->appends($request->query());
+
+        $customerBookings = $customerQuery
+            ->latest('booking_CreatedAt')
+            ->paginate(5, ['*'], 'customer_page')
+            ->appends($request->query());
+
+        // 6. Format Results
+        $this->formatBookingCollection($adminBookings->getCollection());
+        $this->formatBookingCollection($customerBookings->getCollection());
+
+        return view(
+            $viewContext->path . '.ViewBooking',
+            compact(
+                'adminBookings',
+                'customerBookings',
+                'monthList',
+                'selectedMonth',
+                'selectedStatus'
+            )
+        );
+
+    } else {
+
+        // --- CUSTOMER LOGIC (UNCHANGED) ---
+
+        $userId    = session('user_id');
+        $userEmail = session('user_email');
+
+        $monthList = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = $now->copy()->subMonths($i);
+            $monthList[$date->format('Y-m')] = $date->format('F Y');
+        }
+        for ($i = 1; $i <= 6; $i++) {
+            $date = $now->copy()->addMonths($i);
+            $monthList[$date->format('Y-m')] = $date->format('F Y');
+        }
+
+        $selectedMonth = $request->input('month', $now->format('Y-m'));
+        $year  = Carbon::parse($selectedMonth)->year;
+        $month = Carbon::parse($selectedMonth)->month;
+
         $pendingBookingsQuery = Booking::with(['slot', 'field'])
             ->where(function ($q) use ($userId, $userEmail) {
                 $q->where('booking.userID', $userId)
                   ->orWhere('booking.booking_Email', $userEmail);
             })
             ->whereIn('booking.booking_Status', ['paid'])
-            ->join('slot', 'booking.slotID', '=', 'slot.slotID')
-            ->whereYear('slot.slot_Date', $year)
-            ->whereMonth('slot.slot_Date', $month)
-            ->select('booking.*')
-            ->orderBy('slot.slot_Date', 'asc')
-            ->orderBy('slot.slot_Time', 'asc');
+            ->whereHas('slot', function ($q) use ($year, $month) {
+                $q->whereYear('slot_Date', $year)
+                  ->whereMonth('slot_Date', $month);
+            })
+            ->orderBy('booking_CreatedAt', 'asc');
 
-        $pendingBookings = $pendingBookingsQuery->paginate(5, ['*'], 'pending_page')->appends($request->query());
+        $pendingBookings = $pendingBookingsQuery
+            ->paginate(5, ['*'], 'pending_page')
+            ->appends($request->query());
+
         $this->formatBookingCollection($pendingBookings->getCollection());
 
-
-        // 4. --- QUERY 2: COMPLETED BOOKINGS ---
         $completedBookingsQuery = Booking::with(['slot', 'field'])
             ->where(function ($q) use ($userId, $userEmail) {
                 $q->where('booking.userID', $userId)
                   ->orWhere('booking.booking_Email', $userEmail);
             })
             ->where('booking.booking_Status', 'completed')
-            ->join('slot', 'booking.slotID', '=', 'slot.slotID')
-            ->whereYear('slot.slot_Date', $year)
-            ->whereMonth('slot.slot_Date', $month)
-            ->select('booking.*')
-            ->orderBy('slot.slot_Date', 'desc')
-            ->orderBy('slot.slot_Time', 'desc');
+            ->whereHas('slot', function ($q) use ($year, $month) {
+                $q->whereYear('slot_Date', $year)
+                  ->whereMonth('slot_Date', $month);
+            })
+            ->orderBy('booking_CreatedAt', 'desc');
 
+        $completedBookings = $completedBookingsQuery
+            ->paginate(5, ['*'], 'completed_page')
+            ->appends($request->query());
 
-        $completedBookings = $completedBookingsQuery->paginate(5, ['*'], 'completed_page')->appends($request->query());
         $this->formatBookingCollection($completedBookings->getCollection());
 
-
         return view($viewContext->path . '.ViewBooking', [
-            'pendingBookings' => $pendingBookings,
+            'pendingBookings'   => $pendingBookings,
             'completedBookings' => $completedBookings,
-            'monthList' => $monthList,
-            'selectedMonth' => $selectedMonth
+            'monthList'         => $monthList,
+            'selectedMonth'     => $selectedMonth
         ]);
     }
 }
+
 
     private function formatBookingCollection($collection)
     {
