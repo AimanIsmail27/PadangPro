@@ -37,10 +37,13 @@ return [
 
 
     'google' => [
-        'client_id' => env('GOOGLE_CLIENT_ID'),
-        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('GOOGLE_REDIRECT'),
-    ],
+    'client_id' => env('GOOGLE_CLIENT_ID'),
+    'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+    'redirect' => env('APP_ENV') === 'production' 
+        ? 'https://padangpro-production.up.railway.app/login/google/callback'
+        : 'http://localhost:8000/login/google/callback',
+],
+
 
     'toyyibpay' => [
     'secret_key'   => env('TOYYIBPAY_SECRET_KEY'),
