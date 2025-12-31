@@ -3,9 +3,10 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Middleware\TrustProxies;
-use Illuminate\Support\Facades\URL; // add this
-
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Mail; // Added
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory; // Added
+use Symfony\Component\Mailer\Transport\Dsn; // Added
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,9 +23,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-            if ($this->app->environment('production')) {
-        URL::forceScheme('https');
+        // Force HTTPS in production
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
 
+        // Register the Brevo Mail Driver
+        Mail::extend('brevo', function (array $config) {
+            return (new BrevoTransportFactory)->create(
+                new Dsn(
+                    'brevo+api',
+                    'default',
+                    config('services.brevo.key')
+                )
+            );
+        });
     }
-}
 }
