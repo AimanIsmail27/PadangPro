@@ -52,6 +52,13 @@ Route::middleware([PreventBackHistory::class])->group(function () {
     })->name('login');
 
     Route::post('/login', [loginController::class, 'login'])->name('login.post');
+    // --- Forgot Password Routes ---
+    Route::get('/forgot-password', [loginController::class, 'showForgotPasswordForm'])->name('password.request');
+    Route::post('/forgot-password', [loginController::class, 'sendResetLinkEmail'])->name('password.email');
+
+    // --- NEW: Reset Password Routes (The link from the email) ---
+    Route::get('/reset-password/{token}', [loginController::class, 'showResetPasswordForm'])->name('password.reset');
+    Route::post('/reset-password', [loginController::class, 'updatePassword'])->name('password.update');
 });
 
 Route::get('/register', [registerController::class, 'showRegistrationForm'])->name('register');

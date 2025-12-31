@@ -69,22 +69,29 @@
                 </div>
 
                 <div>
-                    <label class="block text-lg font-medium mb-1 text-gray-700">Password</label>
-                    <div class="relative">
-                        <input type="password" name="password" id="passwordInput" 
-                               class="w-full border border-gray-300 rounded px-4 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all" 
-                               placeholder="Enter your password">
-                        <span onclick="togglePassword()" class="absolute right-3 top-3.5 cursor-pointer text-gray-400 hover:text-gray-600">
-                            <svg xmlns="https://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </span>
-                    </div>
-                    @error('password')
-                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
+    <label class="block text-lg font-medium mb-1 text-gray-700">Password</label>
+    <div class="relative">
+        <input type="password" name="password" id="passwordInput" 
+               class="w-full border border-gray-300 rounded px-4 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all" 
+               placeholder="Enter your password">
+        <span onclick="togglePassword()" class="absolute right-3 top-3.5 cursor-pointer text-gray-400 hover:text-gray-600">
+            <svg xmlns="https://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </span>
+    </div>
+    
+    <div class="flex justify-end mt-2">
+        <a href="{{ route('password.request') }}" class="text-sm font-semibold text-blue-600 hover:underline">
+            Forgot Password?
+        </a>
+    </div>
+
+    @error('password')
+        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+    @enderror
+</div>
 
                 <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold text-lg shadow-md">
                     Login
