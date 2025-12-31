@@ -122,7 +122,7 @@ public function sendResetLinkEmail(Request $request)
 
     // 5. Send the Email
     // Note: You will need to create a simple 'emails.forgetPassword' view later
-    Mail::queue('emails.forgetPassword', ['token' => $token, 'email' => $request->email], function($message) use($request){
+    Mail::send('emails.forgetPassword', ['token' => $token, 'email' => $request->email], function($message) use($request){
         $message->to($request->email);
         $message->subject('Reset Password - PadangPro');
     });
