@@ -3,14 +3,15 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class WelcomeMail extends Mailable
+class WelcomeMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public $customerName; // public property to use in the email
+    public $customerName;
 
     /**
      * Create a new message instance.
@@ -26,6 +27,6 @@ class WelcomeMail extends Mailable
     public function build()
     {
         return $this->subject('Welcome to PadangPro!')
-                    ->view('emails.welcome'); // We'll create this view next
+                    ->view('emails.welcome');
     }
 }
