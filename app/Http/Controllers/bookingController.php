@@ -216,16 +216,21 @@ class BookingController extends Controller
 
         // 1. Get Month List (PAST + FUTURE)
         $monthList = [];
+        $current = $now->copy()->startOfMonth(); // fix the reference to the start of current month
 
-        for ($i = 6; $i >= 0; $i--) {
-            $date = $now->copy()->subMonths($i);
-            $monthList[$date->format('Y-m')] = $date->format('F Y');
+        // 6 months before current month
+        for ($i = 6; $i >= 1; $i--) {
+            $monthList[$current->copy()->subMonths($i)->format('Y-m')] = $current->copy()->subMonths($i)->format('F Y');
         }
 
+        // current month
+        $monthList[$current->format('Y-m')] = $current->format('F Y');
+
+        // 6 months after current month
         for ($i = 1; $i <= 6; $i++) {
-            $date = $now->copy()->addMonths($i);
-            $monthList[$date->format('Y-m')] = $date->format('F Y');
+            $monthList[$current->copy()->addMonths($i)->format('Y-m')] = $current->copy()->addMonths($i)->format('F Y');
         }
+
 
         // 2. Get Filters
         $selectedMonth  = $request->input('month', $now->format('Y-m'));
@@ -316,14 +321,21 @@ class BookingController extends Controller
         $userEmail = session('user_email');
 
         $monthList = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = $now->copy()->subMonths($i);
-            $monthList[$date->format('Y-m')] = $date->format('F Y');
+        $current = $now->copy()->startOfMonth(); // fix the reference to the start of current month
+
+        // 6 months before current month
+        for ($i = 6; $i >= 1; $i--) {
+            $monthList[$current->copy()->subMonths($i)->format('Y-m')] = $current->copy()->subMonths($i)->format('F Y');
         }
+
+        // current month
+        $monthList[$current->format('Y-m')] = $current->format('F Y');
+
+        // 6 months after current month
         for ($i = 1; $i <= 6; $i++) {
-            $date = $now->copy()->addMonths($i);
-            $monthList[$date->format('Y-m')] = $date->format('F Y');
+            $monthList[$current->copy()->addMonths($i)->format('Y-m')] = $current->copy()->addMonths($i)->format('F Y');
         }
+
 
         $selectedMonth = $request->input('month', $now->format('Y-m'));
         $year  = Carbon::parse($selectedMonth)->year;
