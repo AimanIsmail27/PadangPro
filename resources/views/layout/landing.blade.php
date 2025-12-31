@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PadangPro - @yield('title')</title>
+
+    <link rel="icon" type="image/png" href="{{ asset('images/logoPadang.png') }}">
+<link rel="shortcut icon" type="image/png" href="{{ asset('images/logoPadang.png') }}">
     @vite('resources/css/landing.css')
 </head>
 <body>
