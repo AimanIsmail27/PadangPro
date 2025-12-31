@@ -51,4 +51,7 @@ return [
     'url'          => env('TOYYIBPAY_URL', 'https://toyyibpay.com'),
 ],
 
+'brevo' => [
+    'key' => env('BREVO_API_KEY'),
+],
 ];
