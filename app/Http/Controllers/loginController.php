@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Mail\ForgetPasswordMail;
 
 class loginController extends Controller
 {
@@ -92,7 +93,6 @@ public function showForgotPasswordForm()
     return view('auth.forgot-password');
 }
 
-// Handle the email submission
 public function sendResetLinkEmail(Request $request)
 {
     // 1. Validate email
@@ -101,7 +101,7 @@ public function sendResetLinkEmail(Request $request)
     // 2. Check if user exists
     $user = User::where('user_Email', $request->email)->first();
 
-    // For security, even if user doesn't exist, we tell them the email was sent
+    // For security, always return success even if email isn't found
     if (!$user) {
         return back()->with('status', 'If an account exists for this email, a reset link has been sent.');
     }
@@ -109,23 +109,20 @@ public function sendResetLinkEmail(Request $request)
     // 3. Create a unique token
     $token = Str::random(64);
 
-    // 4. Store token in password_reset_tokens table (default Laravel table)
-    // If you don't have this table, run: php artisan make:notifications-table
+    // 4. Store token in password_reset_tokens table
     DB::table('password_reset_tokens')->updateOrInsert(
         ['email' => $request->email],
         [
             'email' => $request->email,
-            'token' => Hash::make($token), // We hash it for security
+            'token' => Hash::make($token),
             'created_at' => Carbon::now()
         ]
     );
 
-    // 5. Send the Email
-    // Note: You will need to create a simple 'emails.forgetPassword' view later
-    Mail::send('emails.forgetPassword', ['token' => $token, 'email' => $request->email], function($message) use($request){
-        $message->to($request->email);
-        $message->subject('Reset Password - PadangPro');
-    });
+    // 5. Send the Email using the Mailable
+    // Because ForgetPasswordMail implements ShouldQueue, 
+    // Laravel will automatically push this to the 'jobs' table.
+    Mail::to($request->email)->send(new ForgetPasswordMail($token, $request->email));
 
     return back()->with('status', 'We have e-mailed your password reset link!');
 }
