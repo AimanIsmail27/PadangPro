@@ -198,7 +198,18 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
     
     // --- ADMIN: Rating & Review Routes ---
     Route::get('/admin/ratings', [ratingController::class, 'showCustomerRatings'])->name('admin.rating.view')->middleware('role:administrator');
-    
+    // --- ADMIN: Review Moderation Routes ---
+    Route::middleware('role:administrator')->prefix('admin/reviews')->group(function () {
+        // View all flagged/under-review reviews
+        Route::get('/moderation', [ratingController::class, 'adminModeration'])->name('admin.reviews.moderation');
+
+        // Approve a flagged review
+        Route::post('/{review}/approve', [ratingController::class, 'approveReview'])->name('admin.reviews.approve');
+
+        // Remove a flagged review
+        Route::post('/{review}/remove', [ratingController::class, 'removeReview'])->name('admin.reviews.remove');
+    });
+
     // --- ADMIN: Report Routes ---
     Route::prefix('admin/reports')->name('admin.reports.')->middleware('role:administrator')->group(function () {
         Route::get('/', [reportController::class, 'index'])->name('index');

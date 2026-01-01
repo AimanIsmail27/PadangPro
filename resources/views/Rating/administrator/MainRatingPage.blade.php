@@ -6,23 +6,32 @@
 
 <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 text-white pt-8 pb-24 px-10 rounded-lg shadow-lg">
     <h1 class="text-2xl font-bold">ALL RATING & REVIEW</h1>
-    
 </div>
 
 <div class="bg-white rounded-xl shadow-md border border-gray-100 p-6 md:p-8 w-11/12 mx-auto -mt-16 relative">
 
-    <div class="flex justify-between items-center mb-6 flex-wrap gap-3 border-b pb-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b pb-4">
         <h2 class="text-xl font-semibold text-gray-800">Customer Feedback</h2>
-        <div class="flex items-center space-x-3">
-            <label for="filter" class="text-gray-700 font-medium">Sort By:</label>
-            <select id="filter"
-                    class="border-gray-300 rounded-md p-2 shadow-sm focus:ring-amber-500 focus:border-amber-500"
-                    onchange="window.location='{{ route('admin.rating.view') }}?filter=' + this.value">
-                <option value="latest" {{ $currentSort == 'latest' ? 'selected' : '' }}>Latest</option>
-                <option value="oldest" {{ $currentSort == 'oldest' ? 'selected' : '' }}>Oldest</option>
-                <option value="high_rating" {{ $currentSort == 'high_rating' ? 'selected' : '' }}>Highest Rating</option>
-                <option value="low_rating" {{ $currentSort == 'low_rating' ? 'selected' : '' }}>Lowest Rating</option>
-            </select>
+
+        <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
+            <!-- Sort By Dropdown -->
+            <div class="flex items-center space-x-2">
+                <label for="filter" class="text-gray-700 font-medium">Sort By:</label>
+                <select id="filter"
+                        class="border-gray-300 rounded-md p-2 shadow-sm focus:ring-amber-500 focus:border-amber-500"
+                        onchange="window.location='{{ route('admin.rating.view') }}?filter=' + this.value">
+                    <option value="latest" {{ $currentSort == 'latest' ? 'selected' : '' }}>Latest</option>
+                    <option value="oldest" {{ $currentSort == 'oldest' ? 'selected' : '' }}>Oldest</option>
+                    <option value="high_rating" {{ $currentSort == 'high_rating' ? 'selected' : '' }}>Highest Rating</option>
+                    <option value="low_rating" {{ $currentSort == 'low_rating' ? 'selected' : '' }}>Lowest Rating</option>
+                </select>
+            </div>
+
+            <!-- Moderation Button -->
+            <a href="{{ route('admin.reviews.moderation') }}"
+               class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition w-full sm:w-auto text-center">
+               Review Moderation
+            </a>
         </div>
     </div>
 

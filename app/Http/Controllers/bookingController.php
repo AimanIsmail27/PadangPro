@@ -61,12 +61,14 @@ class BookingController extends Controller
 
         // --- NEW: Fetch Reviews for this Field ---
         // We need to find Ratings -> linked to Bookings -> linked to this Field
-        $reviews = Rating::whereHas('booking', function ($query) use ($fieldID) {
+        $reviews = Rating::where('status', 'normal') // <-- only approved reviews
+            ->whereHas('booking', function ($query) use ($fieldID) {
                 $query->where('fieldID', $fieldID);
             })
-            ->with('customer.user') // Eager load customer name
+            ->with('customer.user')
             ->latest('review_Date')
             ->paginate(4);
+
 
         // Calculate Average Rating
         $averageRating = $reviews->avg('rating_Score');
@@ -95,12 +97,14 @@ class BookingController extends Controller
         $slotsForCalendar = $this->prepareSlotsForCalendar($field->fieldID);
 
         // 2. NEW: Fetch Reviews for this specific Field
-        $reviews = \App\Models\Rating::whereHas('booking', function ($query) use ($field) {
+        $reviews = \App\Models\Rating::where('status', 'normal') // <-- correct column name
+            ->whereHas('booking', function ($query) use ($field) {
                 $query->where('fieldID', $field->fieldID);
             })
-            ->with('customer.user') // Eager load customer info
+            ->with('customer.user')
             ->latest('review_Date')
-            ->paginate(4); // Pagination
+            ->paginate(4);
+
 
         // 3. Calculate Average Rating
         $averageRating = \App\Models\Rating::whereHas('booking', function ($query) use ($field) {

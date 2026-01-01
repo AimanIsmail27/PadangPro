@@ -54,7 +54,7 @@
                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
             </div>
             <div>
-                <label for="booking_BackupNumber" class="block text-sm font-medium text-gray-700">Backup Phone Number (Optional)</label>
+                <label for="booking_BackupNumber" class="block text-sm font-medium text-gray-700">Backup Phone Number</label>
                 <input type="text" name="booking_BackupNumber" id="booking_BackupNumber" value="{{ old('booking_BackupNumber', $booking->booking_BackupNumber) }}"
                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500">
             </div>

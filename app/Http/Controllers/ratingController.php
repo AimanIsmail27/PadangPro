@@ -23,7 +23,8 @@ class RatingController extends Controller
         $userType = $request->session()->get('user_type');
 
         // Start a query to fetch all ratings
-        $allRatingsQuery = Rating::with(['customer.user', 'booking.field', 'rental.item']);
+        $allRatingsQuery = Rating::with(['customer.user', 'booking.field', 'rental.item'])
+         ->where('status', 'normal');
 
         // Sorting Logic
         $sortBy = $request->get('filter', 'latest');
@@ -129,40 +130,60 @@ class RatingController extends Controller
      * Store the specific review.
      */
     public function storeSpecificReview(Request $request)
-    {
-        $request->validate([
-            'rating_Score' => 'required|integer|min:1|max:5',
-            'review_Given' => 'required|string|max:255',
-            'type'         => 'required|in:booking,rental',
-            'id'           => 'required|string'
-        ]);
+{
+    $request->validate([
+        'rating_Score' => 'required|integer|min:1|max:5',
+        'review_Given' => 'required|string|max:255',
+        'type'         => 'required|in:booking,rental',
+        'id'           => 'required|string'
+    ]);
 
-        $userId = session('user_id');
-        $nowKL = Carbon::now('Asia/Kuala_Lumpur');
-        $uniqueID = 'RAT' . strtoupper(uniqid());
+    $userId = session('user_id');
+    $nowKL = Carbon::now('Asia/Kuala_Lumpur');
+    $uniqueID = 'RAT' . strtoupper(uniqid());
 
-        $data = [
-            'ratingID' => $uniqueID,
-            'rating_Score' => $request->rating_Score,
-            'review_Given' => $request->review_Given,
-            'review_Date' => $nowKL->toDateString(),
-            'review_Time' => $nowKL->toDateTimeString(),
-            'userID' => $userId,
-        ];
+    // ===== Automatic Detection for prohibited content =====
+    $status = 'normal';
+    $flagReason = null;
 
-        // Attach the correct foreign key
-        if ($request->type === 'booking') {
-            $data['bookingID'] = $request->id;
-            $redirectRoute = 'booking.view';
-        } else {
-            $data['rentalID'] = $request->id;
-            $redirectRoute = 'customer.rental.history';
+    $prohibitedWords = ['nigga','babi','anjing','cibai','kelantan']; // add more as needed
+    foreach ($prohibitedWords as $word) {
+        if (stripos($request->review_Given, $word) !== false) {
+            $status = 'flagged';
+            $flagReason = 'Detected inappropriate content';
+            break;
         }
-
-        Rating::create($data);
-
-        return redirect()->route($redirectRoute)->with('success', 'Thank you! Your review has been submitted.');
     }
+
+    $data = [
+        'ratingID' => $uniqueID,
+        'rating_Score' => $request->rating_Score,
+        'review_Given' => $request->review_Given,
+        'review_Date' => $nowKL->toDateString(),
+        'review_Time' => $nowKL->toDateTimeString(),
+        'userID' => $userId,
+        'status' => $status,           // <-- added
+        'flag_reason' => $flagReason,  // <-- added
+    ];
+
+    // Attach the correct foreign key
+    if ($request->type === 'booking') {
+        $data['bookingID'] = $request->id;
+        $redirectRoute = 'booking.view';
+    } else {
+        $data['rentalID'] = $request->id;
+        $redirectRoute = 'customer.rental.history';
+    }
+
+    Rating::create($data);
+
+    $message = $status === 'flagged'
+        ? 'Your review has been submitted and is under review due to detected content.'
+        : 'Thank you! Your review has been submitted.';
+
+    return redirect()->route($redirectRoute)->with('success', $message);
+}
+
 
     // =================================================================
     // EXISTING METHODS (Edit, Update, Delete, API)
@@ -184,28 +205,48 @@ class RatingController extends Controller
      * Handle review update request.
      */
     public function updateReview(Request $request, $ratingID)
-    {
-        $review = Rating::where('ratingID', $ratingID)->first();
-        if (!$review) {
-            return redirect()->route('customer.rating.main')->with('error', 'Review not found.');
-        }
-
-        $validated = $request->validate([
-            'rating_Score' => 'required|integer|min:1|max:5',
-            'review_Given' => 'required|string|max:255',
-        ]);
-
-        $nowKL = Carbon::now('Asia/Kuala_Lumpur');
-
-        $review->update([
-            'rating_Score' => $validated['rating_Score'],
-            'review_Given' => $validated['review_Given'],
-            'review_Date' => $nowKL->toDateString(),
-            'review_Time' => $nowKL->toDateTimeString(),
-        ]);
-
-        return redirect()->route('customer.rating.main')->with('success', 'Your review has been updated successfully!');
+{
+    $review = Rating::where('ratingID', $ratingID)->first();
+    if (!$review) {
+        return redirect()->route('customer.rating.main')->with('error', 'Review not found.');
     }
+
+    $validated = $request->validate([
+        'rating_Score' => 'required|integer|min:1|max:5',
+        'review_Given' => 'required|string|max:255',
+    ]);
+
+    $nowKL = Carbon::now('Asia/Kuala_Lumpur');
+
+    // ===== Automatic Detection for prohibited content =====
+    $status = 'normal';
+    $flagReason = null;
+    $prohibitedWords = ['nigga','babi','anjing','cibai','kelantan']; // same hardcoded list
+
+    foreach ($prohibitedWords as $word) {
+        if (stripos($validated['review_Given'], $word) !== false) {
+            $status = 'flagged';
+            $flagReason = 'Detected inappropriate content';
+            break;
+        }
+    }
+
+    $review->update([
+        'rating_Score' => $validated['rating_Score'],
+        'review_Given' => $validated['review_Given'],
+        'review_Date' => $nowKL->toDateString(),
+        'review_Time' => $nowKL->toDateTimeString(),
+        'status' => $status,           // added
+        'flag_reason' => $flagReason,  // added
+    ]);
+
+    $message = $status === 'flagged'
+        ? 'Your review has been updated but is under review due to detected content.'
+        : 'Your review has been updated successfully!';
+
+    return redirect()->route('customer.rating.main')->with('success', $message);
+}
+
 
     /**
      * Delete user's own review.
@@ -232,6 +273,7 @@ class RatingController extends Controller
         $reviews = Rating::with('customer')
             ->whereNotNull('review_Given')
             ->where('review_Given', '!=', '')
+            ->where('status', 'normal')
             ->latest('review_Date')
             ->take(3)
             ->get();
@@ -252,4 +294,51 @@ class RatingController extends Controller
 
         return response()->json($formattedReviews);
     }
+
+    // Show all flagged or under-review reviews for admin
+public function adminModeration()
+{
+    $reviews = Rating::whereIn('status', ['flagged', 'under_review'])
+                     ->with(['customer', 'booking.field', 'rental.item'])
+                     ->latest('review_Date', 'review_Time')
+                     ->get();
+
+    return view('Rating.administrator.moderationPage', compact('reviews'));
+}
+
+// Approve a flagged review
+public function approveReview(Rating $review)
+{
+    $review->update([
+        'status' => 'normal',
+        'admin_action' => json_encode([
+            'admin_id' => session('user_id'),
+            'action' => 'approved',
+            'timestamp' => now()
+        ])
+    ]);
+
+    return back()->with('success', 'Review approved successfully.');
+}
+
+// Remove a flagged review
+public function removeReview(Request $request, Rating $review)
+{
+    $request->validate([
+        'reason' => 'required|string'
+    ]);
+
+    $review->update([
+        'status' => 'removed_by_admin',
+        'admin_action' => json_encode([
+            'admin_id' => session('user_id'),
+            'action' => 'removed',
+            'reason' => $request->reason,
+            'timestamp' => now()
+        ])
+    ]);
+
+    return back()->with('success', 'Review removed successfully.');
+}
+
 }

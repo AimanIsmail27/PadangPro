@@ -31,6 +31,9 @@ class Rating extends Model
         'userID',
         'bookingID', // <-- Added
         'rentalID',
+        'status',        // <-- new
+        'flag_reason',   // <-- new
+        'admin_action',  // <-- new
     ];
 
     public function customer()

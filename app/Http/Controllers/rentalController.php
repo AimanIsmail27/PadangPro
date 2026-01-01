@@ -334,13 +334,16 @@ class RentalController extends Controller
             $item->available_quantity = $item->item_Quantity - $rentedCount; 
 
             // Rating Calculation
-            $item->avg_rating = Rating::whereHas('rental', function($q) use ($item) {
+            $item->avg_rating = Rating::where('status', 'normal') // <-- only approved
+            ->whereHas('rental', function($q) use ($item) {
                 $q->where('itemID', $item->itemID);
             })->avg('rating_Score') ?? 0;
 
-            $item->rating_count = Rating::whereHas('rental', function($q) use ($item) {
+        $item->rating_count = Rating::where('status', 'normal')
+            ->whereHas('rental', function($q) use ($item) {
                 $q->where('itemID', $item->itemID);
             })->count();
+
             
             return $item;
         })
@@ -386,16 +389,19 @@ class RentalController extends Controller
         if($availableQuantity < 0) $availableQuantity = 0;
 
         // Reviews
-        $reviews = Rating::whereHas('rental', function ($query) use ($itemID) {
+        $reviews = Rating::where('status', 'normal') // <-- only approved
+            ->whereHas('rental', function ($query) use ($itemID) {
                 $query->where('itemID', $itemID);
             })
             ->with('customer.user')
             ->latest('review_Date')
             ->paginate(3);
 
-        $averageRating = Rating::whereHas('rental', function ($query) use ($itemID) {
+        $averageRating = Rating::where('status', 'normal')
+            ->whereHas('rental', function ($query) use ($itemID) {
                 $query->where('itemID', $itemID);
             })->avg('rating_Score');
+
 
         $totalReviews = $reviews->total();
 
