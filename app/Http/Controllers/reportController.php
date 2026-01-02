@@ -54,52 +54,55 @@ class ReportController extends Controller
     $viewContext = $this->getViewContext();
     $now = Carbon::now('Asia/Kuala_Lumpur');
 
+    // Month boundaries (IMPORTANT)
+    $startOfMonth = $now->copy()->startOfMonth();
+    $startOfNextMonth = $now->copy()->addMonth()->startOfMonth();
+
     /*
     |--------------------------------------------------------------------------
-    | PART 1: KPIs (CURRENT MONTH)
+    | PART 1: KPIs (CURRENT MONTH – SERVICE DATE BASED)
     |--------------------------------------------------------------------------
     */
 
-    // ✅ 1. BOOKING REVENUE (FROM PAYMENT TABLE)
+    // ✅ 1. BOOKING REVENUE (BASED ON SLOT DATE)
     $kpi_revenue = Payment::whereNotNull('payment.bookingID')
         ->whereIn('payment.payment_Status', [
             'paid',
             'paid_balance',
             'paid_balance (cash)'
         ])
-        ->whereYear('payment.created_at', $now->year)
-        ->whereMonth('payment.created_at', $now->month)
+        ->join('booking', 'payment.bookingID', '=', 'booking.bookingID')
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->whereBetween('slot.slot_Date', [$startOfMonth, $startOfNextMonth])
         ->sum('payment.payment_Amount');
 
-    // ✅ 2. TOTAL BOOKINGS (FULLY PAID BOOKINGS)
-    $kpi_bookings = Booking::where('booking_Status', 'completed')
-        ->whereYear('booking_CreatedAt', $now->year)
-        ->whereMonth('booking_CreatedAt', $now->month)
+    // ✅ 2. TOTAL BOOKINGS (BASED ON SLOT DATE)
+    $kpi_bookings = Booking::whereIn('booking.booking_Status', ['paid', 'completed'])
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->whereBetween('slot.slot_Date', [$startOfMonth, $startOfNextMonth])
         ->count();
 
-    // ✅ 3. RENTAL REVENUE (UNCHANGED – ALREADY CORRECT)
-    $kpi_rental_revenue = Rental::where('rental.rental_Status', 'paid')
-        ->whereYear('rental.rental_StartDate', $now->year)
-        ->whereMonth('rental.rental_StartDate', $now->month)
-        ->join('item', 'rental.itemID', '=', 'item.itemID')
-        ->select(DB::raw(
-            'SUM(
-                rental.quantity * 
-                item.item_Price * 
-                (DATEDIFF(rental.rental_EndDate, rental.rental_StartDate) + 1)
-            ) as total'
-        ))
-        ->value('total') ?? 0;
+    // ✅ 3. RENTAL REVENUE (BASED ON RENTAL START DATE, FROM PAYMENT TABLE)
+    $kpi_rental_revenue = Payment::whereNotNull('payment.rentalID')
+        ->whereIn('payment.payment_Status', [
+            'paid',
+            'paid_balance',
+            'paid_balance (cash)'
+        ])
+        ->join('rental', 'payment.rentalID', '=', 'rental.rentalID')
+        ->whereBetween('rental.rental_StartDate', [$startOfMonth, $startOfNextMonth])
+        ->sum('payment.payment_Amount');
 
-    // ✅ 4. TOTAL ITEMS RENTED
+    // ✅ 4. TOTAL ITEMS RENTED (BASED ON RENTAL START DATE)
     $kpi_items_rented = Rental::where('rental_Status', 'paid')
-        ->whereYear('rental_StartDate', $now->year)
-        ->whereMonth('rental_StartDate', $now->month)
+        ->whereBetween('rental_StartDate', [$startOfMonth, $startOfNextMonth])
         ->sum('quantity');
 
     /*
     |--------------------------------------------------------------------------
     | PART 2: MONTHLY BOOKING REVENUE CHART (LAST 6 MONTHS)
+    |--------------------------------------------------------------------------
+    | (UNCHANGED)
     |--------------------------------------------------------------------------
     */
 
@@ -111,10 +114,12 @@ class ReportController extends Controller
             'paid_balance',
             'paid_balance (cash)'
         ])
-        ->where('payment.created_at', '>=', $sixMonthsAgo)
+        ->join('booking', 'payment.bookingID', '=', 'booking.bookingID')
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->where('slot.slot_Date', '>=', $sixMonthsAgo)
         ->select(
             DB::raw('SUM(payment.payment_Amount) as total_revenue'),
-            DB::raw('DATE_FORMAT(payment.created_at, "%Y-%m") as month')
+            DB::raw('DATE_FORMAT(slot.slot_Date, "%Y-%m") as month')
         )
         ->groupBy('month')
         ->orderBy('month', 'asc')
@@ -128,7 +133,6 @@ class ReportController extends Controller
         $monthKey = $period->format('Y-m');
 
         $chartLabels[] = $period->format('M Y');
-
         $monthData = $monthlyRevenueData->firstWhere('month', $monthKey);
         $chartData[] = $monthData ? (float) $monthData->total_revenue : 0;
     }
@@ -136,6 +140,8 @@ class ReportController extends Controller
     /*
     |--------------------------------------------------------------------------
     | PART 3: TOP RENTED ITEMS (LAST 90 DAYS)
+    |--------------------------------------------------------------------------
+    | (UNCHANGED)
     |--------------------------------------------------------------------------
     */
 
@@ -151,15 +157,6 @@ class ReportController extends Controller
         ->limit(5)
         ->get();
 
-    $topItemsLabels = $topItemsData->pluck('item_Name');
-    $topItemsQuantities = $topItemsData->pluck('total_rented');
-
-    /*
-    |--------------------------------------------------------------------------
-    | RETURN VIEW
-    |--------------------------------------------------------------------------
-    */
-
     return view($viewContext->view_path . '.MainReportPage', [
         'kpi_revenue' => $kpi_revenue,
         'kpi_bookings' => $kpi_bookings,
@@ -167,10 +164,11 @@ class ReportController extends Controller
         'kpi_items_rented' => $kpi_items_rented,
         'chartLabels' => json_encode($chartLabels),
         'chartData' => json_encode($chartData),
-        'topItemsLabels' => json_encode($topItemsLabels),
-        'topItemsQuantities' => json_encode($topItemsQuantities),
+        'topItemsLabels' => json_encode($topItemsData->pluck('item_Name')),
+        'topItemsQuantities' => json_encode($topItemsData->pluck('total_rented')),
     ]);
 }
+
 
 
     /**

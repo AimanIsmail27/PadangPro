@@ -691,49 +691,94 @@ public function dashboardAdmin()
 {
     $userId = session('user_id');
     $now = Carbon::now('Asia/Kuala_Lumpur');
+
+    // Month boundaries (VERY IMPORTANT)
     $startOfMonth = $now->copy()->startOfMonth();
+    $startOfNextMonth = $now->copy()->addMonth()->startOfMonth();
     $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
 
-    // 1. Get Admin's name
+    /*
+    |--------------------------------------------------------------------------
+    | 1. Admin Name
+    |--------------------------------------------------------------------------
+    */
     $admin = Administrator::where('userID', $userId)->first();
     $fullName = $admin ? $admin->admin_FullName : 'Administrator';
 
-    // 2. Get Data for KPI Cards (This Month)
-    $kpi_totalRevenue = Payment::whereIn('payment_Status', ['paid', 'paid_balance', 'paid_balance (cash)'])
-        ->where('created_at', '>=', $startOfMonth)
-        ->sum('payment_Amount');
+    /*
+    |--------------------------------------------------------------------------
+    | 2. KPI Cards (This Month – Service Date Based)
+    |--------------------------------------------------------------------------
+    */
 
-    $kpi_totalBookings = Booking::whereIn('booking_Status', ['paid', 'completed'])
-        ->where('booking_CreatedAt', '>=', $startOfMonth)
-        ->count();
-
-    $kpi_totalRentals = Rental::where('rental_Status', 'paid')
-        ->where('rental_StartDate', '>=', $startOfMonth)
-        ->count();
-    
-    // --- 'kpi_newCustomers' query is permanently removed ---
-
-    // 3. Get Data for Revenue Chart (Last 6 Months)
-    $bookingRevenue = Booking::where('booking.booking_Status', 'paid')
-        ->where('booking.booking_CreatedAt', '>=', $sixMonthsAgo)
+    // Booking revenue (slot date falls within this month)
+    $kpi_bookingRevenue = Payment::whereIn('payment.payment_Status', [
+            'paid', 'paid_balance', 'paid_balance (cash)'
+        ])
+        ->whereNotNull('payment.bookingID')
+        ->join('booking', 'payment.bookingID', '=', 'booking.bookingID')
         ->join('slot', 'booking.slotID', '=', 'slot.slotID')
-        ->select(DB::raw('SUM(slot.slot_Price * 0.20) as total'), DB::raw('DATE_FORMAT(booking.booking_CreatedAt, "%Y-%m") as month'))
-        ->groupBy('month')->get()->keyBy('month');
-    
-    $balanceRevenue = Payment::where('payment_Status', 'paid_balance')
-        ->where('created_at', '>=', $sixMonthsAgo)
-        ->select(DB::raw('SUM(payment_Amount) as total'), DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'))
-        ->groupBy('month')->get()->keyBy('month');
+        ->whereBetween('slot.slot_Date', [$startOfMonth, $startOfNextMonth])
+        ->sum('payment.payment_Amount');
 
-    $rentalRevenue = Rental::where('rental.rental_Status', 'paid')
-        ->where('rental.rental_StartDate', '>=', $sixMonthsAgo)
-        ->join('item', 'rental.itemID', '=', 'item.itemID')
+    // Rental revenue (rental start date falls within this month)
+    $kpi_rentalRevenue = Payment::whereIn('payment.payment_Status', [
+            'paid', 'paid_balance', 'paid_balance (cash)'
+        ])
+        ->whereNotNull('payment.rentalID')
+        ->join('rental', 'payment.rentalID', '=', 'rental.rentalID')
+        ->whereBetween('rental.rental_StartDate', [$startOfMonth, $startOfNextMonth])
+        ->sum('payment.payment_Amount');
+
+    $kpi_totalRevenue = $kpi_bookingRevenue + $kpi_rentalRevenue;
+
+    // Total bookings happening this month (by slot date)
+    $kpi_totalBookings = Booking::whereIn('booking.booking_Status', ['paid', 'completed'])
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->whereBetween('slot.slot_Date', [$startOfMonth, $startOfNextMonth])
+        ->count();
+
+    // Total rentals starting this month
+    $kpi_totalRentals = Rental::where('rental_Status', 'paid')
+        ->whereBetween('rental_StartDate', [$startOfMonth, $startOfNextMonth])
+        ->count();
+
+    /*
+    |--------------------------------------------------------------------------
+    | 3. Revenue Overview Chart (Last 6 Months – Accrual Based)
+    |--------------------------------------------------------------------------
+    */
+
+    // Booking revenue grouped by slot month
+    $bookingRevenue = Payment::whereIn('payment.payment_Status', [
+            'paid', 'paid_balance', 'paid_balance (cash)'
+        ])
+        ->whereNotNull('payment.bookingID')
+        ->join('booking', 'payment.bookingID', '=', 'booking.bookingID')
+        ->join('slot', 'booking.slotID', '=', 'slot.slotID')
+        ->where('slot.slot_Date', '>=', $sixMonthsAgo)
         ->select(
-            DB::raw('SUM(rental.quantity * item.item_Price * (DATEDIFF(rental.rental_EndDate, rental.rental_StartDate) + 1)) as total'),
+            DB::raw('SUM(payment.payment_Amount) as total'),
+            DB::raw('DATE_FORMAT(slot.slot_Date, "%Y-%m") as month')
+        )
+        ->groupBy('month')
+        ->get()
+        ->keyBy('month');
+
+    // Rental revenue grouped by rental start month
+    $rentalRevenue = Payment::whereIn('payment.payment_Status', [
+            'paid', 'paid_balance', 'paid_balance (cash)'
+        ])
+        ->whereNotNull('payment.rentalID')
+        ->join('rental', 'payment.rentalID', '=', 'rental.rentalID')
+        ->where('rental.rental_StartDate', '>=', $sixMonthsAgo)
+        ->select(
+            DB::raw('SUM(payment.payment_Amount) as total'),
             DB::raw('DATE_FORMAT(rental.rental_StartDate, "%Y-%m") as month')
         )
         ->groupBy('month')
-        ->get()->keyBy('month');
+        ->get()
+        ->keyBy('month');
 
     $chartLabels = [];
     $chartBookingData = [];
@@ -742,45 +787,51 @@ public function dashboardAdmin()
     for ($i = 5; $i >= 0; $i--) {
         $month = $now->copy()->subMonths($i);
         $monthKey = $month->format('Y-m');
+
         $chartLabels[] = $month->format('M');
-        
-        $b_revenue = $bookingRevenue->get($monthKey) ? $bookingRevenue->get($monthKey)->total : 0;
-        $bal_revenue = $balanceRevenue->get($monthKey) ? $balanceRevenue->get($monthKey)->total : 0;
-        $chartBookingData[] = $b_revenue + $bal_revenue; 
-        
-        $chartRentalData[] = $rentalRevenue->get($monthKey) ? $rentalRevenue->get($monthKey)->total : 0;
+        $chartBookingData[] = $bookingRevenue[$monthKey]->total ?? 0;
+        $chartRentalData[]  = $rentalRevenue[$monthKey]->total ?? 0;
     }
 
-    // 4. Get Data for Field Popularity (Doughnut Chart)
+    /*
+    |--------------------------------------------------------------------------
+    | 4. Field Popularity (All Time)
+    |--------------------------------------------------------------------------
+    */
     $fieldPopularity = Booking::whereIn('booking_Status', ['paid', 'completed'])
         ->join('field', 'booking.fieldID', '=', 'field.fieldID')
         ->select('field.field_Label', DB::raw('COUNT(booking.bookingID) as count'))
         ->groupBy('booking.fieldID', 'field.field_Label')
         ->get();
 
-    // 5. Get Data for Action Lists
+    /*
+    |--------------------------------------------------------------------------
+    | 5. Action Lists
+    |--------------------------------------------------------------------------
+    */
     $pendingApprovals = Rental::with('customer', 'item')
         ->where('return_Status', 'requested')
         ->latest('rental_EndDate')
         ->take(5)
         ->get();
-    
-    // --- THIS IS THE FIX ---
-    // Sort by the primary key 'customerID' in descending order
+
     $recentCustomers = Customer::with('user')
-        ->orderBy('customerID', 'desc') 
+        ->orderBy('customerID', 'desc')
         ->take(5)
         ->get();
-    // --- END FIX ---
 
-    // 6. Pass all data to the view
+    /*
+    |--------------------------------------------------------------------------
+    | 6. Return View
+    |--------------------------------------------------------------------------
+    */
     return view('Profile.admin.dashboard', [
         'fullName' => $fullName,
+
         'kpi_totalRevenue' => $kpi_totalRevenue,
         'kpi_totalBookings' => $kpi_totalBookings,
         'kpi_totalRentals' => $kpi_totalRentals,
-        // 'kpi_newCustomers' is removed
-        
+
         'chartLabels' => json_encode($chartLabels),
         'chartBookingData' => json_encode($chartBookingData),
         'chartRentalData' => json_encode($chartRentalData),
@@ -792,4 +843,5 @@ public function dashboardAdmin()
         'recentCustomers' => $recentCustomers,
     ]);
 }
+
 }

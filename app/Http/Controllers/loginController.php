@@ -74,10 +74,7 @@ class loginController extends Controller
     // Logout user
     public function logout(Request $request)
 {
-    // If using Auth facade (optional, but good practice)
-    // Auth::logout();
 
-    // Invalidate the session completely
     $request->session()->invalidate();
 
     // Regenerate CSRF token to prevent reuse
@@ -87,7 +84,7 @@ class loginController extends Controller
     return redirect()->route('login')->with('success', 'Logged out successfully');
 }
 
-// Show the form to request a reset link (Already handled by closure in web.php, but good to have here)
+
 public function showForgotPasswordForm()
 {
     return view('auth.forgot-password');
@@ -95,21 +92,21 @@ public function showForgotPasswordForm()
 
 public function sendResetLinkEmail(Request $request)
 {
-    // 1. Validate email
+  
     $request->validate(['email' => 'required|email']);
 
-    // 2. Check if user exists
+    
     $user = User::where('user_Email', $request->email)->first();
 
-    // For security, always return success even if email isn't found
+   
     if (!$user) {
         return back()->with('status', 'If an account exists for this email, a reset link has been sent.');
     }
 
-    // 3. Create a unique token
+    
     $token = Str::random(64);
 
-    // 4. Store token in password_reset_tokens table
+
     DB::table('password_reset_tokens')->updateOrInsert(
         ['email' => $request->email],
         [
@@ -119,15 +116,13 @@ public function sendResetLinkEmail(Request $request)
         ]
     );
 
-    // 5. Send the Email using the Mailable
-    // Because ForgetPasswordMail implements ShouldQueue, 
-    // Laravel will automatically push this to the 'jobs' table.
+ 
     Mail::to($request->email)->send(new ForgetPasswordMail($token, $request->email));
 
     return back()->with('status', 'We have e-mailed your password reset link!');
 }
 
-// Show the form to enter a NEW password
+
 public function showResetPasswordForm($token, Request $request)
 {
     // We pass the token and email (from the URL) to the view
