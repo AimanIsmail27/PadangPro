@@ -128,16 +128,36 @@
     </script>
     <!-- SweetAlert Success Popup -->
     @if (session('success'))
-    <script>
+<script>
+    (function () {
+        const msg = @json(session('success'));
+
+        let title = 'Success!';
+        const lower = msg.toLowerCase();
+
+        if (lower.includes('registration')) {
+            title = 'Registration Successful!';
+        } else if (lower.includes('logged out') || lower.includes('logout')) {
+            title = 'Logged Out Successfully!';
+        } else if (lower.includes('password')) {
+            title = 'Password Updated!';
+        } else if (lower.includes('reset link') || lower.includes('e-mailed')) {
+            title = 'Email Sent!';
+        } else if (lower.includes('login')) {
+            title = 'Login Successful!';
+        }
+
         Swal.fire({
             icon: 'success',
-            title: 'Registration Successful!',
-            text: @json(session('success')),
+            title: title,
+            text: msg,
             confirmButtonColor: '#2563eb',
             timer: 2200,
             timerProgressBar: true
         });
-    </script>
-    @endif
+    })();
+</script>
+@endif
+
 </body>
 </html>
