@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,16 +16,15 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Force HTTPS in production (Railway / Cloud)
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
 
-        /**
-         * Register Brevo mail transport ONLY if the Symfony Brevo bridge is installed.
-         * This prevents "class not found" crashes in production.
-         */
+        Log::info('AppServiceProvider boot() loaded. MAIL_MAILER=' . config('mail.default'));
+
         if (class_exists(\Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoApiTransportFactory::class)) {
+            Log::info('BrevoApiTransportFactory exists. Registering brevo mailer...');
+
             Mail::extend('brevo', function (array $config) {
                 $factory = new \Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoApiTransportFactory(
                     \Symfony\Component\HttpClient\HttpClient::create()
@@ -38,6 +38,8 @@ class AppServiceProvider extends ServiceProvider
                     )
                 );
             });
+        } else {
+            Log::error('BrevoApiTransportFactory class NOT found on this server.');
         }
     }
 }
