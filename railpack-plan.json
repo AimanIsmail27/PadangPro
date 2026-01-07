@@ -1,0 +1,10 @@
+{
+  "steps": {
+    "install:composer": {
+      "commands": [
+        "echo \"BUILD_ID=$(date +%s)\" > /tmp/build_id",
+        "composer install --optimize-autoloader --no-scripts --no-interaction"
+      ]
+    }
+  }
+}
