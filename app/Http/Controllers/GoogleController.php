@@ -36,7 +36,7 @@ class GoogleController extends Controller
                     'userID'        => $newUserID,
                     'user_Email'    => $googleUser->getEmail(),
                     // store NULL means "no password set yet"
-                    'user_Password' => null,
+                    'user_Password' => '',
                     'user_Type'     => 'customer',
                 ]);
 
