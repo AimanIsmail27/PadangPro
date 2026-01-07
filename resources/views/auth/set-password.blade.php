@@ -25,9 +25,9 @@
         </h1>
 
         <div class="hidden md:block absolute bottom-10 left-10 font-bold italic text-[90px] leading-tight" style="font-family: 'Poppins', sans-serif;">
-            Secure.<br>
-            Ready.<br>
-            Play.
+            Reserve.<br>
+            Play.<br>
+            Repeat.
         </div>
         
         <div class="md:hidden flex flex-col justify-center h-full pb-10 text-center">
