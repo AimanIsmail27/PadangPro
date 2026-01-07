@@ -98,8 +98,10 @@ return [
         ],
 
         'brevo' => [
-        'transport' => 'brevo',
-    ],
+    'transport' => 'smtp',
+    'url' => 'brevo+api://'.env('BREVO_API_KEY').'@default',
+],
+
 
     ],
 
