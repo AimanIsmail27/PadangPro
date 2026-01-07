@@ -5,9 +5,10 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Mail;
-use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoApiTransportFactory;
+use Illuminate\Support\Facades\Log;
+
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
 use Symfony\Component\Mailer\Transport\Dsn;
-use Symfony\Component\HttpClient\HttpClient;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,15 +23,21 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Register Brevo API transport as a Laravel mail transport called "brevo"
-        Mail::extend('brevo', function () {
-            $factory = new BrevoApiTransportFactory(HttpClient::create());
+        // Register Brevo (API) transport as a Laravel mail transport called "brevo"
+        if (class_exists(BrevoTransportFactory::class)) {
+            Log::info('BrevoTransportFactory exists. Registering brevo mailer...');
 
-            return $factory->create(new Dsn(
-                'brevo+api',
-                'default',
-                config('services.brevo.key')
-            ));
-        });
+            Mail::extend('brevo', function () {
+                return (new BrevoTransportFactory())->create(
+                    new Dsn(
+                        'brevo+api',
+                        'default',
+                        config('services.brevo.key')
+                    )
+                );
+            });
+        } else {
+            Log::error('BrevoTransportFactory class NOT found on this server. Did composer install symfony/brevo-mailer?');
+        }
     }
 }

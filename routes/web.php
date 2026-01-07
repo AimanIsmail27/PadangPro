@@ -25,11 +25,12 @@ Route::get('/_debug/mail', function () {
     return response()->json([
         'php_version' => PHP_VERSION,
         'mail_default' => config('mail.default'),
-        'brevo_api_factory_exists' => class_exists(\Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoApiTransportFactory::class),
+        'brevo_transport_factory_exists' => class_exists(\Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory::class),
         'http_client_exists' => class_exists(\Symfony\Component\HttpClient\HttpClient::class),
+        'brevo_key_is_set' => !empty(config('services.brevo.key')),
         'loaded_mailers' => array_keys(config('mail.mailers', [])),
     ]);
-    });
+});
 
 // --- Google Login ---
 Route::get('/login/google', [GoogleController::class, 'redirectToGoogle'])->name('login.google');
