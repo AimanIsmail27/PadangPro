@@ -8,6 +8,9 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -123,5 +126,18 @@
             x.type = x.type === "password" ? "text" : "password";
         }
     </script>
+    <!-- SweetAlert Success Popup -->
+    @if (session('success'))
+    <script>
+        Swal.fire({
+            icon: 'success',
+            title: 'Registration Successful!',
+            text: @json(session('success')),
+            confirmButtonColor: '#2563eb',
+            timer: 2200,
+            timerProgressBar: true
+        });
+    </script>
+    @endif
 </body>
 </html>
