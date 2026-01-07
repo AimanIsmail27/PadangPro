@@ -74,6 +74,13 @@ Route::middleware([AuthSession::class, PreventBackHistory::class])->group(functi
     // --- Logout ---
     Route::get('/logout', [loginController::class, 'logout'])->name('logout');
 
+    Route::get('/set-password', [GoogleController::class, 'showSetPasswordForm'])
+    ->name('google.password.form');
+
+    Route::post('/set-password', [GoogleController::class, 'saveSetPassword'])
+    ->name('google.password.save');
+
+
     // --- All Profile & Dashboard Routes ---
     Route::prefix('profile')->group(function () {
         
