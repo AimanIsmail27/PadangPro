@@ -52,8 +52,8 @@ class GoogleController extends Controller
                     'customer_Position'     => null,
                 ]);
 
-               // Mail::to($googleUser->getEmail())
-                 //   ->queue(new WelcomeMail($googleUser->getName() ?? 'Google User'));
+                Mail::to($googleUser->getEmail())
+                    ->queue(new WelcomeMail($googleUser->getName() ?? 'Google User'));
             }
 
             DB::commit();
