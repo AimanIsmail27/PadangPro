@@ -21,6 +21,15 @@ use App\Http\Middleware\AuthSession;
 Route::view('/', 'landing.home')->name('home');
 Route::view('/about', 'landing.about')->name('about');
 Route::get('/latest-reviews', [ratingController::class, 'getLatestReviews'])->name('reviews.latest');
+Route::get('/_debug/mail', function () {
+    return response()->json([
+        'php_version' => PHP_VERSION,
+        'mail_default' => config('mail.default'),
+        'brevo_api_factory_exists' => class_exists(\Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoApiTransportFactory::class),
+        'http_client_exists' => class_exists(\Symfony\Component\HttpClient\HttpClient::class),
+        'loaded_mailers' => array_keys(config('mail.mailers', [])),
+    ]);
+    });
 
 // --- Google Login ---
 Route::get('/login/google', [GoogleController::class, 'redirectToGoogle'])->name('login.google');
