@@ -11,8 +11,29 @@ use App\Models\Booking;
 use App\Models\Rental;
 use Illuminate\Support\Facades\Log;
 
+// ✅ NEW (email receipt)
+use Illuminate\Support\Facades\Mail;
+use App\Mail\PaymentReceiptMail;
+
 class PaymentController extends Controller
 {
+    /**
+     * ✅ Helper: send receipt email (won’t break payment flow if email fails)
+     */
+    private function sendReceiptEmail(?string $toEmail, array $data): void
+    {
+        if (!$toEmail) return;
+
+        try {
+            Mail::to($toEmail)->send(new PaymentReceiptMail($data));
+        } catch (\Exception $e) {
+            Log::error('Receipt email failed: ' . $e->getMessage(), [
+                'to' => $toEmail,
+                'data' => $data,
+            ]);
+        }
+    }
+
     /**
      * Create a ToyyibPay bill and redirect user to payment page
      */
@@ -25,12 +46,9 @@ class PaymentController extends Controller
         $amount = $deposit * 100; // ToyyibPay uses cents
 
         // ToyyibPay API request
-        // --- CHANGE 1: Use the DEV URL ---
         $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
-            // --- CHANGE 2: Use your DEV credentials ---
             'userSecretKey'         => env('TOYYIBPAY_SECRET_DEV'),
-            'categoryCode'          => env('TOYYIBPAY_CATEGORY_RENTAL'), // Use your dev category
-            // --- END CHANGES ---
+            'categoryCode'          => env('TOYYIBPAY_CATEGORY_RENTAL'),
             'billName'              => 'PadangPro Booking',
             'billDescription'       => 'Payment for booking ' . $booking->bookingID,
             'billPriceSetting'      => 1,
@@ -44,7 +62,6 @@ class PaymentController extends Controller
             'billPhone'             => $booking->booking_PhoneNumber,
         ]);
 
-        // Add error handling to prevent "array offset on value of type null"
         if (!$response->successful() || !isset($response->json()[0]['BillCode'])) {
             Log::error('ToyyibPay (DEV) initial deposit creation failed.', ['response' => $response->body()]);
             return redirect()->route('booking.confirmation', ['bookingID' => $bookingID])
@@ -53,7 +70,6 @@ class PaymentController extends Controller
 
         $bill = $response->json()[0];
 
-        // Save into payment table
         Payment::create([
             'paymentID'       => 'PAY' . uniqid(),
             'payer_Name'      => $booking->booking_Name,
@@ -66,7 +82,6 @@ class PaymentController extends Controller
             'updated_at'      => now(),
         ]);
 
-        // --- CHANGE 3: Redirect user to the DEV ToyyibPay URL ---
         return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $bill['BillCode']);
     }
 
@@ -75,8 +90,7 @@ class PaymentController extends Controller
      */
     public function paymentReturn(Request $request)
     {
-        // ToyyibPay sends status back in the query string
-        $status    = $request->status_id ?? $request->status; // sometimes it's status_id
+        $status    = $request->status_id ?? $request->status;
         $bookingID = $request->order_id ?? $request->billExternalReferenceNo ?? null;
 
         if ($bookingID) {
@@ -107,21 +121,42 @@ class PaymentController extends Controller
     {
         $bookingID = $request->billExternalReferenceNo;
         $status    = $request->status; // 1=paid, 0=unpaid
-        $refNo     = $request->refno ?? null; // ToyyibPay transaction reference
+        $refNo     = $request->refno ?? null;
 
         $payment = Payment::where('bookingID', $bookingID)->latest()->first();
 
         if ($payment) {
             if ($status == 1) {
-                $payment->update([
-                    'payment_Status'    => 'paid',
-                    'payer_BankAccount' => $refNo // save transaction reference number
-                ]);
 
-                // Also update booking status
-                Booking::where('bookingID', $bookingID)->update([
-                    'booking_Status' => 'paid'
-                ]);
+                // ✅ prevent duplicate email if callback hits multiple times
+                if ($payment->payment_Status !== 'paid') {
+                    $payment->update([
+                        'payment_Status'    => 'paid',
+                        'payer_BankAccount' => $refNo
+                    ]);
+
+                    Booking::where('bookingID', $bookingID)->update([
+                        'booking_Status' => 'paid'
+                    ]);
+
+                    // ✅ send receipt (deposit)
+                    $booking = Booking::with('slot', 'field')->where('bookingID', $bookingID)->first();
+                    $this->sendReceiptEmail($booking?->booking_Email, [
+                        'subject' => 'PadangPro Receipt - Booking Deposit',
+                        'name'    => $booking?->booking_Name,
+                        'type'    => 'Booking Deposit (20%)',
+                        'ref'     => $refNo ?? $bookingID,
+                        'amount'  => $payment->payment_Amount,
+                        'date'    => now()->format('Y-m-d H:i'),
+                        'details' => [
+                            'Booking ID' => $bookingID,
+                            'Field'      => $booking?->field?->field_Name ?? '-',
+                            'Slot Date'  => $booking?->slot?->slot_Date ?? '-',
+                            'Slot Time'  => $booking?->slot?->slot_Time ?? '-',
+                        ],
+                    ]);
+                }
+
             } else {
                 $payment->update(['payment_Status' => 'failed']);
             }
@@ -131,145 +166,159 @@ class PaymentController extends Controller
     }
 
 
-  /**
- * ==============================
- *  RENTAL PART
- * ==============================
- */
+    /**
+     * ==============================
+     *  RENTAL PART
+     * ==============================
+     */
 
-// Create ToyyibPay bill and redirect user for rental payment (DEV mode)
-public function createRentalPayment(Request $request, $rentalID)
-{
-    $rental = Rental::with('item')->where('rentalID', $rentalID)->firstOrFail();
+    public function createRentalPayment(Request $request, $rentalID)
+    {
+        $rental = Rental::with('item')->where('rentalID', $rentalID)->firstOrFail();
 
-    $totalPrice = $request->input('total_amount');
-    \Log::info('POST received for rentalID: ' . $rentalID, ['request' => $request->all()]);
+        $totalPrice = $request->input('total_amount');
+        \Log::info('POST received for rentalID: ' . $rentalID, ['request' => $request->all()]);
 
-    if (!$totalPrice || $totalPrice <= 0) {
-        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
-            ->with('error', 'Invalid total amount for payment.');
+        if (!$totalPrice || $totalPrice <= 0) {
+            return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+                ->with('error', 'Invalid total amount for payment.');
+        }
+
+        $amount = intval($totalPrice * 100);
+
+        $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
+            'userSecretKey'           => env('TOYYIBPAY_SECRET_DEV'),
+            'categoryCode'            => env('TOYYIBPAY_CATEGORY_RENTAL'),
+            'billName'                => 'PadangPro Rental',
+            'billDescription'         => 'Payment for rental ' . $rental->rentalID,
+            'billPriceSetting'        => 1,
+            'billPayorInfo'           => 1,
+            'billAmount'              => $amount,
+            'billReturnUrl'           => route('customer.rental.payment.return'),
+            'billCallbackUrl'         => route('customer.rental.payment.callback'),
+            'billExternalReferenceNo' => $rental->rentalID,
+            'billTo'                  => $rental->rental_Name,
+            'billEmail'               => $rental->rental_Email,
+            'billPhone'               => $rental->rental_PhoneNumber,
+        ]);
+
+        \Log::info('ToyyibPay raw response for rentalID ' . $rentalID, ['body' => $response->body(), 'status' => $response->status()]);
+
+        $billData = $response->json();
+        \Log::info('ToyyibPay response for rentalID ' . $rentalID, ['response' => $billData]);
+
+        if (!isset($billData[0]['BillCode'])) {
+            return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+                ->with('error', 'Failed to create payment. Please try again.');
+        }
+
+        $billCode = $billData[0]['BillCode'];
+
+        Payment::create([
+            'paymentID'         => 'PAY' . uniqid(),
+            'payer_Name'        => $rental->rental_Name,
+            'payer_BankAccount' => null,
+            'payment_Amount'    => $totalPrice,
+            'payment_Status'    => 'pending',
+            'rentalID'          => $rental->rentalID,
+            'userID'            => $rental->userID,
+            'created_at'        => now(),
+            'updated_at'        => now(),
+        ]);
+
+        return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $billCode);
     }
 
-    $amount = intval($totalPrice * 100); // convert to cents
+    public function rentalPaymentReturn(Request $request)
+    {
+        $status   = $request->status_id ?? $request->status;
+        $rentalID = $request->order_id ?? $request->billExternalReferenceNo ?? null;
 
-    // Use dev environment
-    $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
-        'userSecretKey'           => env('TOYYIBPAY_SECRET_DEV'),
-        'categoryCode'            => env('TOYYIBPAY_CATEGORY_RENTAL'),
-        'billName'                => 'PadangPro Rental',
-        'billDescription'         => 'Payment for rental ' . $rental->rentalID,
-        'billPriceSetting'        => 1,
-        'billPayorInfo'           => 1,
-        'billAmount'              => $amount,
-        'billReturnUrl'           => route('customer.rental.payment.return'),
-        'billCallbackUrl'         => route('customer.rental.payment.callback'),
-        'billExternalReferenceNo' => $rental->rentalID,
-        'billTo'                  => $rental->rental_Name,
-        'billEmail'               => $rental->rental_Email,
-        'billPhone'               => $rental->rental_PhoneNumber,
-    ]);
+        if (!$rentalID) {
+            return redirect()->route('customer.rental.main')
+                ->with('error', 'Rental payment status could not be verified.');
+        }
 
-    \Log::info('ToyyibPay raw response for rentalID ' . $rentalID, ['body' => $response->body(), 'status' => $response->status()]);
+        $payment = Payment::where('rentalID', $rentalID)->latest()->first();
 
-    $billData = $response->json();
-    \Log::info('ToyyibPay response for rentalID ' . $rentalID, ['response' => $billData]);
+        if (!$payment) {
+            return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+                ->with('error', 'Payment record not found.');
+        }
 
-    if (!isset($billData[0]['BillCode'])) {
-        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
-            ->with('error', 'Failed to create payment. Please try again.');
-    }
-
-    $billCode = $billData[0]['BillCode'];
-
-    Payment::create([
-        'paymentID'         => 'PAY' . uniqid(),
-        'payer_Name'        => $rental->rental_Name,
-        'payer_BankAccount' => null,
-        'payment_Amount'    => $totalPrice,
-        'payment_Status'    => 'pending',
-        'rentalID'          => $rental->rentalID,
-        'userID'            => $rental->userID,
-        'created_at'        => now(),
-        'updated_at'        => now(),
-    ]);
-
-    // Redirect to dev ToyyibPay payment page
-    return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $billCode);
-}
-
-// Handle return (user-facing after rental payment)
-public function rentalPaymentReturn(Request $request)
-{
-    $status   = $request->status_id ?? $request->status;
-    $rentalID = $request->order_id ?? $request->billExternalReferenceNo ?? null;
-
-    if (!$rentalID) {
-        return redirect()->route('customer.rental.main')
-            ->with('error', 'Rental payment status could not be verified.');
-    }
-
-    $payment = Payment::where('rentalID', $rentalID)->latest()->first();
-
-    if (!$payment) {
-        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
-            ->with('error', 'Payment record not found.');
-    }
-
-    if ($status == 1) {
-        $payment->update(['payment_Status' => 'paid']);
-        Rental::where('rentalID', $rentalID)->update(['rental_Status' => 'paid']);
-
-        return redirect()->route('customer.rental.main')
-            ->with('success', 'Rental payment successful!');
-    } else {
-        $payment->update(['payment_Status' => 'failed']);
-        return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
-            ->with('error', 'Your rental payment was cancelled or failed. Please try again.');
-    }
-}
-
-// Handle callback (server-to-server confirmation)
-public function rentalPaymentCallback(Request $request)
-{
-    $rentalID = $request->billExternalReferenceNo;
-    $status   = $request->status;
-    $refNo    = $request->refno ?? null;
-
-    $payment = Payment::where('rentalID', $rentalID)->latest()->first();
-
-    if ($payment) {
         if ($status == 1) {
-            $payment->update([
-                'payment_Status'    => 'paid',
-                'payer_BankAccount' => $refNo
-            ]);
+            $payment->update(['payment_Status' => 'paid']);
             Rental::where('rentalID', $rentalID)->update(['rental_Status' => 'paid']);
+
+            return redirect()->route('customer.rental.main')
+                ->with('success', 'Rental payment successful!');
         } else {
             $payment->update(['payment_Status' => 'failed']);
+            return redirect()->route('customer.rental.confirmation', ['rentalID' => $rentalID])
+                ->with('error', 'Your rental payment was cancelled or failed. Please try again.');
         }
     }
 
-    return response()->json(['message' => 'Rental callback processed']);
-}
+    public function rentalPaymentCallback(Request $request)
+    {
+        $rentalID = $request->billExternalReferenceNo;
+        $status   = $request->status;
+        $refNo    = $request->refno ?? null;
 
-/////////////////////////////////////////////////
-//BALANCE PAYMENT PART
-/////////////////////////////////////////////////
-/**
-     * Create a ToyyibPay bill for the 80% BALANCE payment.
-     */
+        $payment = Payment::where('rentalID', $rentalID)->latest()->first();
+
+        if ($payment) {
+            if ($status == 1) {
+
+                // ✅ prevent duplicate email
+                if ($payment->payment_Status !== 'paid') {
+                    $payment->update([
+                        'payment_Status'    => 'paid',
+                        'payer_BankAccount' => $refNo
+                    ]);
+
+                    Rental::where('rentalID', $rentalID)->update(['rental_Status' => 'paid']);
+
+                    $rental = Rental::with('item')->where('rentalID', $rentalID)->first();
+                    $this->sendReceiptEmail($rental?->rental_Email, [
+                        'subject' => 'PadangPro Receipt - Rental Payment',
+                        'name'    => $rental?->rental_Name,
+                        'type'    => 'Rental Payment',
+                        'ref'     => $refNo ?? $rentalID,
+                        'amount'  => $payment->payment_Amount,
+                        'date'    => now()->format('Y-m-d H:i'),
+                        'details' => [
+                            'Rental ID'  => $rentalID,
+                            'Item'       => $rental?->item?->item_Name ?? '-',
+                            'Quantity'   => $rental?->quantity ?? '-',
+                            'Start Date' => $rental?->rental_StartDate ?? '-',
+                            'End Date'   => $rental?->rental_EndDate ?? '-',
+                        ],
+                    ]);
+                }
+
+            } else {
+                $payment->update(['payment_Status' => 'failed']);
+            }
+        }
+
+        return response()->json(['message' => 'Rental callback processed']);
+    }
+
+    /////////////////////////////////////////////////////////////////
+    // BALANCE PAYMENT PART (BOOKING)
+    /////////////////////////////////////////////////////////////////
+
     public function createBalancePayment(Request $request, $bookingID)
     {
         $booking = Booking::with('slot', 'field')->where('bookingID', $bookingID)->firstOrFail();
 
-        // 1. Calculate the 80% balance
-        $balance = $booking->slot->slot_Price * 0.80; // ACTUAL FORMULA
-        //$balance = 1.00; // FOR TESTING (RM 1.00)
-        
-        $amount = $balance * 100; // ToyyibPay uses cents
+        $balance = $booking->slot->slot_Price * 0.80;
+        //$balance = 1.00;
 
-        // 2. Create the ToyyibPay bill
-         $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
+        $amount = $balance * 100;
+
+        $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
             'userSecretKey'         => env('TOYYIBPAY_SECRET_DEV'),
             'categoryCode'          => env('TOYYIBPAY_CATEGORY_RENTAL'),
             'billName'              => 'PadangPro Balance Payment',
@@ -287,85 +336,85 @@ public function rentalPaymentCallback(Request $request)
 
         $bill = $response->json()[0];
 
-        // 3. Create a NEW payment record for this balance
         Payment::create([
             'paymentID'       => 'PAY' . uniqid(),
             'payer_Name'      => $booking->booking_Name,
             'payment_Amount'  => $balance,
-            'payment_Status'  => 'pending_balance', // A new status for this type of payment
+            'payment_Status'  => 'pending_balance',
             'bookingID'       => $booking->bookingID,
             'userID'          => $booking->userID,
             'created_at'      => now(),
             'updated_at'      => now(),
         ]);
 
-        // 4. Redirect to payment page
         return redirect(env('TOYYIBPAY_URL_DEV') .'/' . $bill['BillCode']);
-        
-
     }
 
-    /**
-     * Handle return (user-facing) for BALANCE payment
-     */
     public function paymentReturnBalance(Request $request)
     {
         $status    = $request->status_id ?? $request->status;
         $bookingID = $request->order_id ?? $request->billExternalReferenceNo ?? null;
-        $refNo     = $request->refno ?? null; // Get the transaction ref no
+        $refNo     = $request->refno ?? null;
 
         if (!$bookingID) {
             return redirect()->route('booking.view')->with('error', 'Payment status could not be verified.');
         }
 
         if ($status == 1) {
-            // --- THIS IS THE FIX ---
-            // Manually update the database on return, because callback won't work on localhost
-            
-            // 1. Find the 'pending_balance' payment
             $payment = Payment::where('bookingID', $bookingID)
                               ->where('payment_Status', 'pending_balance')
                               ->latest()->first();
 
             if ($payment) {
-                // 2. Update the Payment record
-                $payment->update([
-                    'payment_Status'    => 'paid_balance',
-                    'payer_BankAccount' => $refNo
-                ]);
+                // ✅ prevent duplicate send if return page refreshed
+                if ($payment->payment_Status !== 'paid_balance') {
+                    $payment->update([
+                        'payment_Status'    => 'paid_balance',
+                        'payer_BankAccount' => $refNo
+                    ]);
 
-                // 3. Update the Booking status to 'completed'
-                Booking::where('bookingID', $bookingID)->update([
-                    'booking_Status' => 'completed'
-                ]);
+                    Booking::where('bookingID', $bookingID)->update([
+                        'booking_Status' => 'completed'
+                    ]);
+
+                    $booking = Booking::with('slot', 'field')->where('bookingID', $bookingID)->first();
+                    $this->sendReceiptEmail($booking?->booking_Email, [
+                        'subject' => 'PadangPro Receipt - Booking Balance',
+                        'name'    => $booking?->booking_Name,
+                        'type'    => 'Booking Balance (80%)',
+                        'ref'     => $refNo ?? $bookingID,
+                        'amount'  => $payment->payment_Amount,
+                        'date'    => now()->format('Y-m-d H:i'),
+                        'details' => [
+                            'Booking ID'     => $bookingID,
+                            'Field'          => $booking?->field?->field_Name ?? '-',
+                            'Slot Date'      => $booking?->slot?->slot_Date ?? '-',
+                            'Slot Time'      => $booking?->slot?->slot_Time ?? '-',
+                            'Booking Status' => 'completed',
+                        ],
+                    ]);
+                }
             }
-            // --- END FIX ---
-            
-            // Success!
+
             return redirect()->route('booking.view')
                        ->with('success', 'Balance payment successful! Your booking is now complete.');
         } else {
-            // Failed or Cancelled
-            // Find and update the payment status to 'failed' for your records
             $payment = Payment::where('bookingID', $bookingID)
                               ->where('payment_Status', 'pending_balance')
                               ->latest()->first();
             if ($payment) {
                  $payment->update(['payment_Status' => 'failed']);
             }
-            
+
             return redirect()->route('booking.view')
                        ->with('error', 'Your balance payment was cancelled or failed. Please try again.');
         }
     }
 
-    /**
-     * Handle callback (server-to-server) for BALANCE payment
-     */
     public function paymentCallbackBalance(Request $request)
     {
         $bookingID = $request->billExternalReferenceNo;
-        $status    = $request->status; // 1=paid
+        $status    = $request->status;
         $refNo     = $request->refno ?? null;
 
         $payment = Payment::where('bookingID', $bookingID)
@@ -373,69 +422,96 @@ public function rentalPaymentCallback(Request $request)
                           ->latest()->first();
 
         if ($payment && $status == 1) {
-            // 1. Update the Payment record
-            $payment->update([
-                'payment_Status'    => 'paid_balance',
-                'payer_BankAccount' => $refNo
-            ]);
 
-            // 2. Update the Booking status to 'completed'
-            Booking::where('bookingID', $bookingID)->update([
-                'booking_Status' => 'completed'
-            ]);
+            // ✅ prevent duplicate email
+            if ($payment->payment_Status !== 'paid_balance') {
+                $payment->update([
+                    'payment_Status'    => 'paid_balance',
+                    'payer_BankAccount' => $refNo
+                ]);
+
+                Booking::where('bookingID', $bookingID)->update([
+                    'booking_Status' => 'completed'
+                ]);
+
+                $booking = Booking::with('slot', 'field')->where('bookingID', $bookingID)->first();
+                $this->sendReceiptEmail($booking?->booking_Email, [
+                    'subject' => 'PadangPro Receipt - Booking Balance',
+                    'name'    => $booking?->booking_Name,
+                    'type'    => 'Booking Balance (80%)',
+                    'ref'     => $refNo ?? $bookingID,
+                    'amount'  => $payment->payment_Amount,
+                    'date'    => now()->format('Y-m-d H:i'),
+                    'details' => [
+                        'Booking ID'     => $bookingID,
+                        'Field'          => $booking?->field?->field_Name ?? '-',
+                        'Slot Date'      => $booking?->slot?->slot_Date ?? '-',
+                        'Slot Time'      => $booking?->slot?->slot_Time ?? '-',
+                        'Booking Status' => 'completed',
+                    ],
+                ]);
+            }
         }
 
         return response()->json(['message' => 'Callback processed']);
     }
 
-
     public function markAsCompleted(Request $request, $bookingID)
     {
-        // Get user type from session
         $userType = session('user_type');
-        
-        // Ensure only staff or admin can do this
+
         if ($userType !== 'staff' && $userType !== 'administrator') {
             return redirect()->route('customer.dashboard')->with('error', 'Unauthorized action.');
         }
 
-        $booking = Booking::with('slot')->findOrFail($bookingID);
+        $booking = Booking::with('slot', 'field')->findOrFail($bookingID);
 
-        // Check if the booking is in the correct status to be completed
         if ($booking->booking_Status == 'paid') {
-            
-            // Update the booking status
+
             $booking->update(['booking_Status' => 'completed']);
 
-            // Create a new payment record for this cash payment
-            Payment::create([
+            $cashPayment = Payment::create([
                 'paymentID'       => 'PAY' . uniqid(),
                 'payer_Name'      => $booking->booking_Name,
-                'payment_Amount'  => $booking->slot->slot_Price * 0.80, // Record the 80% balance
-                'payment_Status'  => 'paid_balance (cash)', // Special status for cash
+                'payment_Amount'  => $booking->slot->slot_Price * 0.80,
+                'payment_Status'  => 'paid_balance (cash)',
                 'bookingID'       => $booking->bookingID,
                 'userID'          => $booking->userID,
-                'payer_BankAccount' => 'CASH_AT_COUNTER', // Record how it was paid
+                'payer_BankAccount' => 'CASH_AT_COUNTER',
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ]);
-            
+
+            // ✅ cash receipt
+            $this->sendReceiptEmail($booking?->booking_Email, [
+                'subject' => 'PadangPro Receipt - Booking Balance (Cash)',
+                'name'    => $booking?->booking_Name,
+                'type'    => 'Booking Balance (Cash)',
+                'ref'     => 'CASH_AT_COUNTER',
+                'amount'  => $cashPayment->payment_Amount,
+                'date'    => now()->format('Y-m-d H:i'),
+                'details' => [
+                    'Booking ID'     => $bookingID,
+                    'Field'          => $booking?->field?->field_Name ?? '-',
+                    'Booking Status' => 'completed',
+                ],
+            ]);
+
             $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
 
             return redirect()->route($redirectRoute)
                              ->with('success', 'Booking ' . $bookingID . ' has been marked as completed.');
 
         } elseif ($booking->booking_Status == 'completed') {
-             $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
-             return redirect()->route($redirectRoute)
+            $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
+            return redirect()->route($redirectRoute)
                              ->with('error', 'This booking is already completed.');
         } else {
-             $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
-             return redirect()->route($redirectRoute)
+            $redirectRoute = ($userType === 'staff') ? 'staff.booking.viewAll' : 'admin.booking.viewAll';
+            return redirect()->route($redirectRoute)
                              ->with('error', 'This booking is not in a valid state to be completed.');
         }
     }
-
 
     // =================================================================
     // RENTAL: BALANCE PAYMENT (Post-Return Approval)
@@ -444,23 +520,20 @@ public function rentalPaymentCallback(Request $request)
     public function createRentalBalancePayment(Request $request, $rentalID)
     {
         $rental = Rental::with('item')->where('rentalID', $rentalID)->firstOrFail();
-        
-       
+
         $days = \Carbon\Carbon::parse($rental->rental_StartDate)
                     ->diffInDays(\Carbon\Carbon::parse($rental->rental_EndDate)) + 1;
-        
+
         $totalCost = $days * $rental->quantity * $rental->item->item_Price;
-        
-        // Calculate 80% balance
-        $balance = $totalCost * 0.80; 
-       
+
+        $balance = $totalCost * 0.80;
+
         if ($balance < 1) {
              return redirect()->back()->with('error', 'Balance amount is too small to process online.');
         }
 
-        $amount = intval($balance * 100); // Convert to cents
+        $amount = intval($balance * 100);
 
-        // ... (The rest of your ToyyibPay code remains exactly the same) ...
         $response = Http::asForm()->post(env('TOYYIBPAY_URL_DEV') . '/index.php/api/createBill', [
             'userSecretKey'         => env('TOYYIBPAY_SECRET_DEV'),
             'categoryCode'          => env('TOYYIBPAY_CATEGORY_RENTAL'),
@@ -469,7 +542,7 @@ public function rentalPaymentCallback(Request $request)
             'billPriceSetting'      => 1,
             'billPayorInfo'         => 1,
             'billAmount'            => $amount,
-            'billReturnUrl'         => route('payment.rental.balance.return'), 
+            'billReturnUrl'         => route('payment.rental.balance.return'),
             'billCallbackUrl'       => route('payment.rental.balance.callback'),
             'billExternalReferenceNo' => $rental->rentalID,
             'billTo'                => $rental->rental_Name,
@@ -488,7 +561,7 @@ public function rentalPaymentCallback(Request $request)
             'paymentID'       => 'PAY' . uniqid(),
             'payer_Name'      => $rental->rental_Name,
             'payment_Amount'  => $balance,
-            'payment_Status'  => 'pending_balance', 
+            'payment_Status'  => 'pending_balance',
             'rentalID'        => $rental->rentalID,
             'userID'          => $rental->userID,
             'created_at'      => now(),
@@ -498,9 +571,6 @@ public function rentalPaymentCallback(Request $request)
         return redirect(env('TOYYIBPAY_URL_DEV') . '/' . $bill['BillCode']);
     }
 
-    /**
-     * 2. Handle User Return (Update DB here for localhost testing)
-     */
     public function rentalBalanceReturn(Request $request)
     {
         $status   = $request->status_id ?? $request->status;
@@ -512,32 +582,49 @@ public function rentalPaymentCallback(Request $request)
         }
 
         if ($status == 1) {
-            // Find the pending balance payment
             $payment = Payment::where('rentalID', $rentalID)
                               ->where('payment_Status', 'pending_balance')
                               ->latest()->first();
 
             if ($payment) {
-                // Update Payment Status
-                $payment->update([
-                    'payment_Status'    => 'paid_balance',
-                    'payer_BankAccount' => $refNo
-                ]);
+                // ✅ prevent duplicate send
+                if ($payment->payment_Status !== 'paid_balance') {
+                    $payment->update([
+                        'payment_Status'    => 'paid_balance',
+                        'payer_BankAccount' => $refNo
+                    ]);
 
-                // Update Rental Status to COMPLETED
-                Rental::where('rentalID', $rentalID)->update([
-                    'rental_Status' => 'completed'
-                ]);
+                    Rental::where('rentalID', $rentalID)->update([
+                        'rental_Status' => 'completed'
+                    ]);
+
+                    $rental = Rental::with('item')->where('rentalID', $rentalID)->first();
+                    $this->sendReceiptEmail($rental?->rental_Email, [
+                        'subject' => 'PadangPro Receipt - Rental Balance',
+                        'name'    => $rental?->rental_Name,
+                        'type'    => 'Rental Balance (80%)',
+                        'ref'     => $refNo ?? $rentalID,
+                        'amount'  => $payment->payment_Amount,
+                        'date'    => now()->format('Y-m-d H:i'),
+                        'details' => [
+                            'Rental ID'     => $rentalID,
+                            'Item'          => $rental?->item?->item_Name ?? '-',
+                            'Quantity'      => $rental?->quantity ?? '-',
+                            'Start Date'    => $rental?->rental_StartDate ?? '-',
+                            'End Date'      => $rental?->rental_EndDate ?? '-',
+                            'Rental Status' => 'completed',
+                        ],
+                    ]);
+                }
             }
 
             return redirect()->route('customer.rental.history')
                              ->with('success', 'Balance paid successfully! Rental completed.');
         } else {
-            // Handle failure
             $payment = Payment::where('rentalID', $rentalID)
                               ->where('payment_Status', 'pending_balance')
                               ->latest()->first();
-            
+
             if ($payment) {
                 $payment->update(['payment_Status' => 'failed']);
             }
@@ -547,9 +634,6 @@ public function rentalPaymentCallback(Request $request)
         }
     }
 
-    /**
-     * 3. Handle Server Callback (For production reliability)
-     */
     public function rentalBalanceCallback(Request $request)
     {
         $rentalID = $request->billExternalReferenceNo;
@@ -561,102 +645,137 @@ public function rentalPaymentCallback(Request $request)
                           ->latest()->first();
 
         if ($payment && $status == 1) {
-            $payment->update([
-                'payment_Status'    => 'paid_balance',
-                'payer_BankAccount' => $refNo
-            ]);
-            
-            Rental::where('rentalID', $rentalID)->update([
-                'rental_Status' => 'completed'
-            ]);
+
+            // ✅ prevent duplicate email
+            if ($payment->payment_Status !== 'paid_balance') {
+                $payment->update([
+                    'payment_Status'    => 'paid_balance',
+                    'payer_BankAccount' => $refNo
+                ]);
+
+                Rental::where('rentalID', $rentalID)->update([
+                    'rental_Status' => 'completed'
+                ]);
+
+                $rental = Rental::with('item')->where('rentalID', $rentalID)->first();
+                $this->sendReceiptEmail($rental?->rental_Email, [
+                    'subject' => 'PadangPro Receipt - Rental Balance',
+                    'name'    => $rental?->rental_Name,
+                    'type'    => 'Rental Balance (80%)',
+                    'ref'     => $refNo ?? $rentalID,
+                    'amount'  => $payment->payment_Amount,
+                    'date'    => now()->format('Y-m-d H:i'),
+                    'details' => [
+                        'Rental ID'     => $rentalID,
+                        'Item'          => $rental?->item?->item_Name ?? '-',
+                        'Quantity'      => $rental?->quantity ?? '-',
+                        'Start Date'    => $rental?->rental_StartDate ?? '-',
+                        'End Date'      => $rental?->rental_EndDate ?? '-',
+                        'Rental Status' => 'completed',
+                    ],
+                ]);
+            }
         }
 
         return response()->json(['status' => 'OK']);
     }
 
-
-/**
-     * Allows Staff/Admin to manually mark a RENTAL as 'completed'
-     * (e.g., when a customer pays the rental balance in cash).
-     */
     public function markRentalAsCompleted(Request $request, $rentalID)
     {
-        // Get user type from session
         $userType = session('user_type');
-        
-        // Ensure only staff or admin can do this
+
         if ($userType !== 'staff' && $userType !== 'administrator') {
             return redirect()->route('customer.dashboard')->with('error', 'Unauthorized action.');
         }
 
         $rental = Rental::with('item')->findOrFail($rentalID);
 
-        // Check if the rental is in the correct status to be completed
         if ($rental->rental_Status == 'paid') {
-            
-            // 1. Calculate the 80% Balance (since it's not stored in DB)
+
             $days = \Carbon\Carbon::parse($rental->rental_StartDate)
                 ->diffInDays(\Carbon\Carbon::parse($rental->rental_EndDate)) + 1;
-            
+
             $totalCost = $days * $rental->quantity * $rental->item->item_Price;
             $balanceAmount = $totalCost * 0.80;
 
-            // 2. Update the rental status
             $rental->update(['rental_Status' => 'completed']);
 
-            // 3. Create a new payment record for this cash payment
-            Payment::create([
+            $cashPayment = Payment::create([
                 'paymentID'       => 'PAY' . uniqid(),
                 'payer_Name'      => $rental->rental_Name,
                 'payment_Amount'  => $balanceAmount,
-                'payment_Status'  => 'paid_balance (cash)', // Special status for cash
+                'payment_Status'  => 'paid_balance (cash)',
                 'rentalID'        => $rental->rentalID,
                 'userID'          => $rental->userID,
-                'payer_BankAccount' => 'CASH_AT_COUNTER', // Record how it was paid
+                'payer_BankAccount' => 'CASH_AT_COUNTER',
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ]);
-            
-            // Redirect back to the previous page (works for both Admin and Staff views)
+
+            // ✅ cash receipt
+            $this->sendReceiptEmail($rental?->rental_Email, [
+                'subject' => 'PadangPro Receipt - Rental Balance (Cash)',
+                'name'    => $rental?->rental_Name,
+                'type'    => 'Rental Balance (Cash)',
+                'ref'     => 'CASH_AT_COUNTER',
+                'amount'  => $cashPayment->payment_Amount,
+                'date'    => now()->format('Y-m-d H:i'),
+                'details' => [
+                    'Rental ID'     => $rentalID,
+                    'Item'          => $rental?->item?->item_Name ?? '-',
+                    'Quantity'      => $rental?->quantity ?? '-',
+                    'Rental Status' => 'completed',
+                ],
+            ]);
+
             return redirect()->back()->with('success', 'Rental ' . $rentalID . ' has been marked as completed.');
 
         } elseif ($rental->rental_Status == 'completed') {
-             return redirect()->back()->with('error', 'This rental is already completed.');
+            return redirect()->back()->with('error', 'This rental is already completed.');
         } else {
-             return redirect()->back()->with('error', 'This rental is not in a valid state to be completed.');
+            return redirect()->back()->with('error', 'This rental is not in a valid state to be completed.');
         }
     }
 
-        public function recordDeposit($bookingID, $depositAmount, $method = 'cash')
+    public function recordDeposit($bookingID, $depositAmount, $method = 'cash')
     {
         try {
             $booking = \App\Models\Booking::where('bookingID', $bookingID)->first();
-    
+
             if (!$booking) {
                 \Log::error("Booking not found for deposit: " . $bookingID);
                 return false;
             }
-    
-            Payment::create([
+
+            $payment = Payment::create([
                 'paymentID'        => 'PAY' . uniqid(),
                 'payer_Name'       => $booking->booking_Name,
                 'payment_Amount'   => $depositAmount,
-                'payment_Status'   => 'paid', // match your naming convention
+                'payment_Status'   => 'paid',
                 'bookingID'        => $booking->bookingID,
                 'userID'           => $booking->userID,
                 'payer_BankAccount'=> strtoupper($method) === 'CASH' ? 'CASH_AT_COUNTER' : null,
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ]);
-    
+
+            // ✅ optional: send cash deposit receipt too
+            $this->sendReceiptEmail($booking->booking_Email ?? null, [
+                'subject' => 'PadangPro Receipt - Booking Deposit (Cash)',
+                'name'    => $booking->booking_Name ?? 'Customer',
+                'type'    => 'Booking Deposit (Cash)',
+                'ref'     => strtoupper($method) === 'CASH' ? 'CASH_AT_COUNTER' : '-',
+                'amount'  => $payment->payment_Amount,
+                'date'    => now()->format('Y-m-d H:i'),
+                'details' => [
+                    'Booking ID' => $bookingID,
+                ],
+            ]);
+
             return true;
         } catch (\Exception $e) {
             \Log::error('Failed to record deposit: ' . $e->getMessage());
             return false;
         }
     }
-
-
-
-
 }
