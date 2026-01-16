@@ -9,27 +9,29 @@ use Illuminate\Support\Facades\File;
 class ExportTrainingData extends Command
 {
     protected $signature = 'export:training-data';
-    protected $description = 'Export paid booking and slot data to a CSV file for AI model training.';
+    protected $description = 'Export successful booking and slot data to a CSV file for AI model training.';
 
     public function handle()
     {
-        $this->info('Fetching paid bookings...');
+        $this->info('Fetching successful bookings (paid & completed)...');
 
-        // Fetch all paid bookings with their related slot information
-        $bookings = Booking::where('booking_Status', 'paid')->with('slot')->get();
+        // Fetch all successful bookings (paid OR completed) with their related slot information
+        $bookings = Booking::whereIn('booking_Status', ['paid', 'completed'])
+            ->with('slot')
+            ->get();
 
         if ($bookings->isEmpty()) {
-            $this->warn('No paid bookings found. CSV file will not be created.');
+            $this->warn('No successful bookings found. CSV file will not be created.');
             return 0;
         }
 
-        $this->info("Found {$bookings->count()} paid bookings. Preparing CSV data...");
+        $this->info("Found {$bookings->count()} successful bookings. Preparing CSV data...");
 
         // Define the path for the CSV file
         $filePath = base_path('training_data.csv');
 
         // Prepare the CSV content
-        $csvHeader = ['bookingID', 'slotID', 'slot_Date', 'slot_Time'];
+        $csvHeader = ['bookingID', 'slotID', 'slot_Date', 'slot_Time', 'booking_Status'];
         $csvRows = [];
 
         foreach ($bookings as $booking) {
@@ -40,6 +42,7 @@ class ExportTrainingData extends Command
                     $booking->slot->slotID,
                     $booking->slot->slot_Date,
                     $booking->slot->slot_Time,
+                    $booking->booking_Status,
                 ];
             }
         }
@@ -47,9 +50,11 @@ class ExportTrainingData extends Command
         // Write the data to the CSV file
         $handle = fopen($filePath, 'w');
         fputcsv($handle, $csvHeader);
+
         foreach ($csvRows as $row) {
             fputcsv($handle, $row);
         }
+
         fclose($handle);
 
         $this->info("Successfully exported data to training_data.csv");

@@ -146,7 +146,7 @@ class RatingController extends Controller
     $status = 'normal';
     $flagReason = null;
 
-    $prohibitedWords = ['nigga','babi','anjing','cibai','kelantan']; // add more as needed
+    $prohibitedWords = ['badword','racist','black','noob','sucks']; // add more as needed
     foreach ($prohibitedWords as $word) {
         if (stripos($request->review_Given, $word) !== false) {
             $status = 'flagged';
@@ -221,7 +221,7 @@ class RatingController extends Controller
     // ===== Automatic Detection for prohibited content =====
     $status = 'normal';
     $flagReason = null;
-    $prohibitedWords = ['nigga','babi','anjing','cibai','kelantan']; // same hardcoded list
+    $prohibitedWords = ['badword','racist','black','noob','sucks']; // same hardcoded list
 
     foreach ($prohibitedWords as $word) {
         if (stripos($validated['review_Given'], $word) !== false) {
