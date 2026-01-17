@@ -410,22 +410,46 @@ class ReportController extends Controller
     /**
     * Generate a booking demand forecast by calling the Python AI API.
     */
-    public function getBookingForecast()
-    {
-        // This function is universal and doesn't need to change
-        try {
-            $response = Http::timeout(10)->get('http://127.0.0.1:5000/predict');
+    /**
+ * Generate a booking demand forecast by calling the Python AI API.
+ */
+public function getBookingForecast()
+{
+    try {
+        // Use env in production, fallback to localhost for dev
+        $baseUrl = rtrim(env('FORECAST_API_URL', 'http://127.0.0.1:5000'), '/');
 
-            if ($response->successful()) {
-                return $response->json();
-            } else {
-                \Log::error('AI API request failed: ' . $response->body());
-                return response()->json(['error' => 'Failed to retrieve forecast data.'], 500);
-            }
+        // Optional: allow days via query string (?days=7)
+        $days = request()->query('days', 7);
 
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            \Log::error('Could not connect to AI API: ' . $e->getMessage());
-            return response()->json(['error' => 'The forecast service is currently unavailable.'], 503);
+        $response = Http::timeout(10)->get($baseUrl . '/predict', [
+            'days' => $days
+        ]);
+
+        if ($response->successful()) {
+            return response()->json($response->json(), 200);
         }
+
+        \Log::error('Forecast API request failed: ' . $response->status() . ' | ' . $response->body());
+
+        return response()->json([
+            'error' => 'Failed to retrieve forecast data.',
+            'status' => $response->status()
+        ], 500);
+
+    } catch (\Illuminate\Http\Client\ConnectionException $e) {
+        \Log::error('Could not connect to Forecast API: ' . $e->getMessage());
+
+        return response()->json([
+            'error' => 'The forecast service is currently unavailable.'
+        ], 503);
+    } catch (\Throwable $e) {
+        \Log::error('Unexpected error calling Forecast API: ' . $e->getMessage());
+
+        return response()->json([
+            'error' => 'Unexpected server error.'
+        ], 500);
     }
+}
+
 }
