@@ -1,4 +1,9 @@
-# api.py (Updated for 2026+)
+# api.py (Railway-ready, Updated for 2026+)
+# - Keeps your original logic
+# - Improves /health to actually verify model load
+# - Safer holiday set conversion
+# - Local run uses debug only when explicitly enabled
+# - Railway runs via: gunicorn api:app --bind 0.0.0.0:$PORT
 
 from flask import Flask, jsonify, request
 import joblib
@@ -48,10 +53,7 @@ DEFAULT_HOLIDAYS_BY_YEAR = {
         "2025-05-12", "2025-06-02", "2025-06-06", "2025-08-31", "2025-09-16",
         "2025-10-20", "2025-12-25",
     ],
-
-    # 2026: placeholder minimal set (federal-ish / commonly observed).
-    # IMPORTANT: Replace with the accurate list you want to support (or use HOLIDAYS_JSON_PATH).
-    # If you leave this minimal, holiday impact will be limited but the API will still work correctly.
+    # 2026: minimal placeholder list
     "2026": [
         "2026-01-01",  # New Year
         "2026-05-01",  # Labour Day
@@ -61,13 +63,14 @@ DEFAULT_HOLIDAYS_BY_YEAR = {
     ],
 }
 
+
 def _load_holidays_by_year():
     """Load holiday dates by year from JSON file if provided; otherwise use defaults."""
     if HOLIDAYS_JSON_PATH and os.path.exists(HOLIDAYS_JSON_PATH):
         try:
             with open(HOLIDAYS_JSON_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            # Ensure values are list of ISO strings
+
             cleaned = {}
             for year, dates_list in data.items():
                 if isinstance(dates_list, list):
@@ -76,9 +79,12 @@ def _load_holidays_by_year():
         except Exception as e:
             print(f"WARNING: Failed to load holidays JSON '{HOLIDAYS_JSON_PATH}': {e}")
             return DEFAULT_HOLIDAYS_BY_YEAR
+
     return DEFAULT_HOLIDAYS_BY_YEAR
 
+
 HOLIDAYS_BY_YEAR = _load_holidays_by_year()
+
 
 def _holiday_set_for_year(year: int):
     """Return a set of datetime.date objects for the given year."""
@@ -86,19 +92,19 @@ def _holiday_set_for_year(year: int):
     out = set()
     for d in iso_list:
         try:
-            out.add(date.fromisoformat(d))
+            out.add(date.fromisoformat(str(d)))
         except ValueError:
             # Skip bad entries
             pass
     return out
 
+
 def _today_in_malaysia() -> date:
     """Get today's date in Malaysia timezone (avoids server timezone mismatch)."""
     if ZoneInfo is None:
-        # Fallback: server local date
         return date.today()
-    now_my = datetime.now(ZoneInfo(APP_TZ))
-    return now_my.date()
+    return datetime.now(ZoneInfo(APP_TZ)).date()
+
 
 # ---------------------------
 # Smart Model Loading
@@ -122,6 +128,7 @@ def load_model_if_updated():
         print(f"ERROR: Failed to load model '{MODEL_PATH}': {e}")
         return None
 
+
 # ---------------------------
 # API Endpoints
 # ---------------------------
@@ -131,7 +138,7 @@ def predict():
     if not current_model:
         return jsonify({"error": "Model not loaded.", "model_path": MODEL_PATH}), 500
 
-    # Optional query params
+    # Optional query params:
     # /predict?days=7
     # /predict?days=14&start=2026-02-01
     days = request.args.get("days", default="7")
@@ -161,7 +168,7 @@ def predict():
     for i in range(days):
         d = start_date + timedelta(days=i)
         # if forecast crosses year boundary, refresh holiday set
-        if i == 0 or d.year != (start_date.year):
+        if i == 0 or d.year != start_date.year:
             holiday_set = _holiday_set_for_year(d.year)
 
         future_rows.append({
@@ -205,26 +212,33 @@ def predict():
     }
     return jsonify(response), 200
 
+
 @app.route("/health", methods=["GET"])
 def health_check():
-    # Basic health + model status (useful for deployment checks)
+    # Better: check model file exists AND try loading it (so health is meaningful)
     exists = os.path.exists(MODEL_PATH)
-    loaded = model is not None
+    current_model = load_model_if_updated() if exists else None
+
     return jsonify({
         "status": "ok",
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "timezone": APP_TZ,
         "model_path": MODEL_PATH,
         "model_file_exists": exists,
-        "model_loaded": loaded,
-        "model_last_modified_epoch": last_modified if loaded else None,
+        "model_loaded": current_model is not None,
+        "model_last_modified_epoch": last_modified if current_model is not None else None,
     }), 200
 
+
 # ---------------------------
-# Run the Server
+# Local run only
+# (Railway should use gunicorn, NOT python api.py)
 # ---------------------------
 if __name__ == "__main__":
     print("=" * 60)
     print("🚀 Starting Football Booking Forecast API (Updated for 2026+)")
     print("=" * 60)
-    app.run(host="0.0.0.0", port=5000, debug=True)
+
+    # Only enable debug if you explicitly set FLASK_DEBUG=true locally
+    debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
