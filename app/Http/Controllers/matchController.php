@@ -260,31 +260,43 @@ class MatchController extends Controller
     /**
      * OTHER ADS (AI sorted) + FILTERS
      */
-    public function otherAds(Request $request)
-    {
-        $userId = session('user_id');
-        if (!$userId) {
-            return redirect()->route('login')->with('error', 'Please log in.');
-        }
+    /**
+ * OTHER ADS (AI sorted) + FILTERS
+ */
+public function otherAds(Request $request)
+{
+    $userId = session('user_id');
+    if (!$userId) {
+        return redirect()->route('login')->with('error', 'Please log in.');
+    }
 
-        $customer = Customer::where('userID', $userId)->first();
-        if (!$customer) {
-            return redirect()->back()->with('error', 'Customer profile not found.');
-        }
+    $customer = Customer::where('userID', $userId)->first();
+    if (!$customer) {
+        return redirect()->back()->with('error', 'Customer profile not found.');
+    }
 
-        // view toggle
-        $view = $request->input('view', 'table');
+    // view toggle
+    $view = $request->input('view', 'table');
 
-        // filters
-        $filterType = $request->input('type');          // "Opponent Search" | "Additional Player" | null
-        $filterIntensity = $request->input('intensity'); // "Fun" | "Competitive" | null
-        $minScore = $request->input('min_score');       // 30/50/70 | null
+    // filters
+    $filterType = $request->input('type');           // "Opponent Search" | "Additional Player" | null
+    $filterIntensity = $request->input('intensity'); // "Fun" | "Competitive" | null
+    $minScore = $request->input('min_score');        // 30/50/70 | null
 
-        $currentTime = Carbon::now('Asia/Kuala_Lumpur');
-        $ads = new LengthAwarePaginator([], 0, 5);
+    $currentTime = Carbon::now('Asia/Kuala_Lumpur');
+    $ads = new LengthAwarePaginator([], 0, 5);
 
-        try {
-            $response = Http::post('http://127.0.0.1:5001/match', [
+    // ✅ Use env-based Match API URL (Railway + Localhost friendly)
+    // Local .env: MATCH_API_URL=http://127.0.0.1:5001
+    // Railway:     MATCH_API_URL=https://python-production-701e.up.railway.app
+    $baseUrl = rtrim(env('MATCH_API_URL', ''), '/');
+
+    try {
+        if (empty($baseUrl)) {
+            Log::error('MATCH_API_URL is not set. Falling back to old method.');
+            $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view, $filterType, $filterIntensity);
+        } else {
+            $response = Http::timeout(8)->post($baseUrl . '/match', [
                 'customerID' => $customer->customerID,
                 'customer_SkillLevel' => $customer->customer_SkillLevel,
                 'customer_Availability' => $customer->customer_Availability,
@@ -295,9 +307,10 @@ class MatchController extends Controller
                 $scoredAds = $response->json();
 
                 if (!is_array($scoredAds)) {
-                    Log::error('Fuzzy Match API returned invalid JSON.');
+                    Log::error('Fuzzy Match API returned invalid JSON. Body: ' . $response->body());
                     $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view, $filterType, $filterIntensity);
                 } else {
+                    // Map: adsID => compatibility_score
                     $scoreMap = collect($scoredAds)->pluck('compatibility_score', 'adsID');
                     $sortedAdIds = $scoreMap->keys();
 
@@ -307,7 +320,7 @@ class MatchController extends Controller
                         $query = Advertisement::with('customer.user')
                             ->whereIn('adsID', $sortedAdIds);
 
-                        // Apply DB-level filters (fast)
+                        // Apply DB-level filters
                         if (!empty($filterType)) {
                             $query->where('ads_Type', $filterType);
                         }
@@ -324,17 +337,19 @@ class MatchController extends Controller
                                 'min_score' => $minScore,
                             ]);
 
+                        // attach scores
                         foreach ($ads as $ad) {
                             $ad->compatibility_score = $scoreMap[$ad->adsID] ?? 0;
                         }
 
-                        // Apply min_score filter AFTER scores are attached
+                        // Apply min_score AFTER scores are attached
                         if (!empty($minScore)) {
-                            $filtered = $ads->getCollection()->filter(function ($ad) use ($minScore) {
-                                return (float)($ad->compatibility_score ?? 0) >= (float)$minScore;
-                            })->values();
+                            $filtered = $ads->getCollection()
+                                ->filter(function ($ad) use ($minScore) {
+                                    return (float)($ad->compatibility_score ?? 0) >= (float)$minScore;
+                                })
+                                ->values();
 
-                            // rebuild paginator with filtered collection
                             $ads = new LengthAwarePaginator(
                                 $filtered,
                                 $filtered->count(),
@@ -346,46 +361,52 @@ class MatchController extends Controller
                                 ]
                             );
                         }
+                    } else {
+                        // API returned empty list -> fallback (or keep empty if you prefer)
+                        Log::warning('Fuzzy Match API returned empty results. Falling back to old method.');
+                        $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view, $filterType, $filterIntensity);
                     }
                 }
             } else {
-                Log::error('Fuzzy Match API call failed: ' . $response->body());
+                Log::error('Fuzzy Match API call failed: ' . $response->status() . ' ' . $response->body());
                 $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view, $filterType, $filterIntensity);
             }
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            Log::error('Fuzzy Match API connection failed: ' . $e->getMessage());
-            $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view, $filterType, $filterIntensity);
         }
+    } catch (\Throwable $e) {
+        Log::error('Fuzzy Match API exception: ' . $e->getMessage());
+        $ads = $this->getAdsTheOldWay($customer->customerID, $currentTime, $view, $filterType, $filterIntensity);
+    }
 
-        // mark filled (on visible list)
-        foreach ($ads as $ad) {
+    // mark filled (on visible list)
+    foreach ($ads as $ad) {
+        $approvedCount = Applications::where('adsID', $ad->adsID)->where('status', 'Approved')->count();
+        $maxPlayers = $ad->ads_Type === 'Additional Player' ? $ad->ads_MaxPlayers : 1;
+        if ($approvedCount >= $maxPlayers) {
+            $ad->ads_Status = 'Filled';
+        }
+    }
+
+    // my requests
+    $applications = Applications::where('customerID', $customer->customerID)
+        ->whereHas('advertisement', fn($q) => $q->where('ads_SlotTime', '>', $currentTime))
+        ->with('advertisement.customer')
+        ->orderByDesc('created_at')
+        ->get();
+
+    foreach ($applications as $application) {
+        if ($application->advertisement) {
+            $ad = $application->advertisement;
             $approvedCount = Applications::where('adsID', $ad->adsID)->where('status', 'Approved')->count();
             $maxPlayers = $ad->ads_Type === 'Additional Player' ? $ad->ads_MaxPlayers : 1;
             if ($approvedCount >= $maxPlayers) {
                 $ad->ads_Status = 'Filled';
             }
         }
-
-        // my requests
-        $applications = Applications::where('customerID', $customer->customerID)
-            ->whereHas('advertisement', fn($q) => $q->where('ads_SlotTime', '>', $currentTime))
-            ->with('advertisement.customer')
-            ->orderByDesc('created_at')
-            ->get();
-
-        foreach ($applications as $application) {
-            if ($application->advertisement) {
-                $ad = $application->advertisement;
-                $approvedCount = Applications::where('adsID', $ad->adsID)->where('status', 'Approved')->count();
-                $maxPlayers = $ad->ads_Type === 'Additional Player' ? $ad->ads_MaxPlayers : 1;
-                if ($approvedCount >= $maxPlayers) {
-                    $ad->ads_Status = 'Filled';
-                }
-            }
-        }
-
-        return view('Matchmaking.otherOfferPage', compact('ads', 'applications', 'view'));
     }
+
+    return view('Matchmaking.otherOfferPage', compact('ads', 'applications', 'view'));
+}
+
 
     /**
      * Fallback (no AI)
