@@ -1,5 +1,6 @@
 Flask
 gunicorn
 numpy
+scipy
 scikit-fuzzy
 mysql-connector-python
