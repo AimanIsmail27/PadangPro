@@ -132,6 +132,11 @@ def get_compatibility_score(player, ad):
 
 app = Flask(__name__)
 
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"}), 200
+
+
 # ✅ Railway-ready DB config (uses Railway MySQL env vars if present; falls back to localhost for local dev)
 db_config = {
     "host": os.getenv("MYSQLHOST", "127.0.0.1"),
