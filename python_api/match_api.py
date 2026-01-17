@@ -132,9 +132,19 @@ def get_compatibility_score(player, ad):
 
 app = Flask(__name__)
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"}), 200
+@app.route("/health/db", methods=["GET"])
+def health_db():
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchone()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "ok", "db": "connected"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "db_error": str(e)}), 500
+
 
 
 # ✅ Railway-ready DB config (uses Railway MySQL env vars if present; falls back to localhost for local dev)
