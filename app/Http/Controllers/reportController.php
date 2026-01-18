@@ -200,8 +200,8 @@ class ReportController extends Controller
     ]);
 
     // 2. Variable Setup
-    $startDate = Carbon::parse($request->start_date)->startOfDay();
-    $endDate   = Carbon::parse($request->end_date)->endOfDay();
+    $startDate  = Carbon::parse($request->start_date)->startOfDay();
+    $endDate    = Carbon::parse($request->end_date)->endOfDay();
     $reportType = $request->report_type;
     $groupBy    = $request->input('group_by', 'day');
 
@@ -224,7 +224,7 @@ class ReportController extends Controller
     */
     if ($isBookingReport) {
 
-        // Base: filter by SERVICE DATE (slot date) as you requested
+        // Base: filter by SERVICE DATE (slot date)
         $query = Slot::whereBetween('slot.slot_Date', [$startDate, $endDate]);
         $dateColumn = 'slot.slot_Date';
 
@@ -238,7 +238,7 @@ class ReportController extends Controller
         switch ($reportType) {
 
             case 'booking_revenue':
-                // Group by day/week/month based on slot date, but SUM payment amounts
+                // Group by day/week/month based on slot date, sum payment amounts
                 $dateFormat = match ($groupBy) {
                     'month' => '%Y-%m',
                     'week'  => '%Y-%u',
@@ -249,7 +249,6 @@ class ReportController extends Controller
                     ->join('booking', 'slot.slotID', '=', 'booking.slotID')
                     ->join('payment', 'payment.bookingID', '=', 'booking.bookingID')
                     ->whereIn('payment.payment_Status', $validPaymentStatuses)
-                    // Optional: if you only want revenue for bookings that are at least "paid/completed"
                     ->whereIn('booking.booking_Status', ['paid', 'completed'])
                     ->select(
                         DB::raw("DATE_FORMAT($dateColumn, '$dateFormat') as period"),
@@ -261,7 +260,6 @@ class ReportController extends Controller
                 break;
 
             case 'booking_count':
-                // Count bookings based on slot date (service date)
                 $dateFormat = match ($groupBy) {
                     'month' => '%Y-%m',
                     'week'  => '%Y-%u',
@@ -281,7 +279,6 @@ class ReportController extends Controller
                 break;
 
             case 'field_performance':
-                // Most booked fields (within slot date range)
                 $results = $query
                     ->join('booking', 'slot.slotID', '=', 'booking.slotID')
                     ->join('field', 'slot.fieldID', '=', 'field.fieldID')
@@ -296,7 +293,6 @@ class ReportController extends Controller
                 break;
 
             case 'peak_hours':
-                // Busiest slot times (within slot date range)
                 $results = $query
                     ->join('booking', 'slot.slotID', '=', 'booking.slotID')
                     ->whereIn('booking.booking_Status', ['paid', 'completed'])
@@ -312,23 +308,49 @@ class ReportController extends Controller
 
     if ($isRentalReport) {
 
-        $query = Rental::where('rental_Status', 'paid')
-            ->where('rental_StartDate', '<=', $endDate)
-            ->where('rental_EndDate', '>=', $startDate);
-
-        if ($request->filled('item_id')) {
-            $query->where('rental.itemID', $request->item_id);
-            $item = Item::find($request->item_id);
-            if ($item) $customReportTitle .= ' for ' . $item->item_Name;
-        }
-
         switch ($reportType) {
+
             case 'rental_revenue':
-                // Keep your original logic (uses item price over rental duration)
-                $results = $query->with('item')->get();
+                // ✅ Rental revenue from PAYMENT table (like booking revenue)
+                // ✅ Filter by SERVICE PERIOD (rental overlap) to match your booking "service date" logic
+                $dateFormat = match ($groupBy) {
+                    'month' => '%Y-%m',
+                    'week'  => '%Y-%u',
+                    default => '%Y-%m-%d'
+                };
+
+                $results = Payment::whereNotNull('payment.rentalID')
+                    ->whereIn('payment.payment_Status', $validPaymentStatuses)
+                    ->join('rental', 'payment.rentalID', '=', 'rental.rentalID')
+                    // service-date overlap filter
+                    ->where('rental.rental_StartDate', '<=', $endDate)
+                    ->where('rental.rental_EndDate', '>=', $startDate)
+                    ->when($request->filled('item_id'), function ($q) use ($request, &$customReportTitle) {
+                        $q->where('rental.itemID', $request->item_id);
+                        $item = Item::find($request->item_id);
+                        if ($item) $customReportTitle .= ' for ' . $item->item_Name;
+                    })
+                    // group by rental start date (service-side grouping)
+                    ->select(
+                        DB::raw("DATE_FORMAT(rental.rental_StartDate, '$dateFormat') as period"),
+                        DB::raw("SUM(payment.payment_Amount) as value")
+                    )
+                    ->groupBy('period')
+                    ->orderBy('period', 'asc')
+                    ->get();
                 break;
 
             case 'item_popularity':
+                $query = Rental::where('rental_Status', 'paid')
+                    ->where('rental_StartDate', '<=', $endDate)
+                    ->where('rental_EndDate', '>=', $startDate);
+
+                if ($request->filled('item_id')) {
+                    $query->where('rental.itemID', $request->item_id);
+                    $item = Item::find($request->item_id);
+                    if ($item) $customReportTitle .= ' for ' . $item->item_Name;
+                }
+
                 $results = $query
                     ->join('item', 'rental.itemID', '=', 'item.itemID')
                     ->select(
@@ -344,42 +366,12 @@ class ReportController extends Controller
 
     /*
     |----------------------------------------------------------------------
-    | 5. Prepare Data for Chart.js (keep your original logic)
+    | 5. Prepare Data for Chart.js
     |----------------------------------------------------------------------
     */
     $isCategorical = in_array($reportType, ['field_performance', 'peak_hours', 'item_popularity']);
 
-    if ($reportType === 'rental_revenue') {
-        $dailyRevenue = [];
-        $period = new \DatePeriod(clone $startDate, new \DateInterval('P1D'), clone $endDate->copy()->addDay());
-
-        foreach ($period as $date) {
-            $dailyRevenue[$date->format('Y-m-d')] = 0;
-        }
-
-        foreach ($results as $rental) {
-            if (!$rental->item) continue;
-
-            $rentalStart = Carbon::parse($rental->rental_StartDate);
-            $rentalEnd   = Carbon::parse($rental->rental_EndDate);
-            $rentalDays  = $rentalStart->diffInDays($rentalEnd) + 1;
-
-            $totalPrice = $rental->quantity * $rental->item->item_Price * $rentalDays;
-            $dailyPrice = ($rentalDays > 0) ? $totalPrice / $rentalDays : 0;
-
-            $rentalPeriod = new \DatePeriod($rentalStart, new \DateInterval('P1D'), $rentalEnd->copy()->addDay());
-            foreach ($rentalPeriod as $day) {
-                $dayString = $day->format('Y-m-d');
-                if (isset($dailyRevenue[$dayString])) {
-                    $dailyRevenue[$dayString] += $dailyPrice;
-                }
-            }
-        }
-
-        $customChartLabels = json_encode(array_map(fn($date) => Carbon::parse($date)->format('M j'), array_keys($dailyRevenue)));
-        $customChartData   = json_encode(array_values($dailyRevenue));
-
-    } elseif ($isCategorical) {
+    if ($isCategorical) {
 
         if ($reportType === 'peak_hours') {
             $allTimeSlots = ['08:00:00', '10:00:00', '12:00:00', '14:00:00', '16:00:00', '18:00:00', '20:00:00', '22:00:00'];
@@ -402,6 +394,7 @@ class ReportController extends Controller
         }
 
     } else {
+        // time-series (booking_revenue, booking_count, rental_revenue)
         $labels = match ($groupBy) {
             'week'  => $results->pluck('period')->map(fn($p) => "Week " . substr($p, 5, 2)),
             'month' => $results->pluck('period')->map(fn($p) => Carbon::parse($p . '-01')->format('M Y')),
@@ -414,7 +407,7 @@ class ReportController extends Controller
 
     /*
     |----------------------------------------------------------------------
-    | 6. Calculate Summary Data (your original logic)
+    | 6. Summary Data
     |----------------------------------------------------------------------
     */
     $summaryData = [];
@@ -429,11 +422,7 @@ class ReportController extends Controller
         switch ($reportType) {
             case 'booking_revenue':
             case 'rental_revenue':
-                $divisor = $endDate->diffInDays($startDate) + 1;
-                $average = ($divisor > 0) ? $sum / $divisor : 0;
-
                 $summaryData['total'] = "RM " . number_format($sum, 2);
-                $summaryData['average'] = "RM " . number_format($average, 2);
 
                 if ($peakIndices->isNotEmpty()) {
                     $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index] ?? '')->implode(', ');
@@ -442,11 +431,7 @@ class ReportController extends Controller
                 break;
 
             case 'booking_count':
-                $divisor = $endDate->diffInDays($startDate) + 1;
-                $average = ($divisor > 0) ? $sum / $divisor : 0;
-
                 $summaryData['total'] = intval($sum) . " Bookings";
-                $summaryData['average'] = number_format($average, 1);
 
                 if ($peakIndices->isNotEmpty()) {
                     $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index] ?? '')->implode(', ');
@@ -486,6 +471,7 @@ class ReportController extends Controller
         'groupBy'            => $groupBy,
     ]);
 }
+
 
 
     public function publish(Request $request)
