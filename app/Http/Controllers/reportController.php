@@ -562,42 +562,54 @@ public function getBookingForecast()
         ], 500);
     }
 }
+
 public function downloadPdf(Request $request)
 {
-    // 1) Validate
+    // 1️⃣ Validate incoming data (NO chart image anymore)
     $request->validate([
-        'chart_image' => 'required|string',
-        'title'       => 'required|string',
-        'report_type' => 'required|string',
-        'summary'     => 'nullable|string',
-        'meta'        => 'nullable|string',
-        'insights'    => 'nullable|string',
+        'title'        => 'required|string',
+        'report_type'  => 'required|string',
+        'summary'      => 'nullable|string',
+        'meta'         => 'nullable|string',
+        'table_labels' => 'required|string',
+        'table_values' => 'required|string',
+        'insights'     => 'nullable|string',
     ]);
 
-
-    // 2) Decode JSON safely
+    // 2️⃣ Decode JSON safely
     $summaryData = json_decode($request->summary, true) ?? [];
-    $meta = json_decode($request->meta, true) ?? [];
-    $insights = json_decode($request->insights, true) ?? [];
+    $meta        = json_decode($request->meta, true) ?? [];
+    $labels      = json_decode($request->table_labels, true) ?? [];
+    $values      = json_decode($request->table_values, true) ?? [];
+    $insights    = json_decode($request->insights, true) ?? [];
 
-    // 3) Render PDF blade
+    // 3️⃣ Defensive check (avoid mismatched table data)
+    if (count($labels) !== count($values)) {
+        abort(400, 'Invalid table data provided.');
+    }
+
+    // 4️⃣ Generate PDF (NO images, NO GD required)
     $pdf = Pdf::loadView('Report.admin.reportPdf', [
         'title'       => $request->title,
         'reportType'  => $request->report_type,
-        'chartImage'  => $request->chart_image,
         'summaryData' => $summaryData,
         'meta'        => $meta,
+        'labels'      => $labels,
+        'values'      => $values,
         'insights'    => $insights,
         'generatedAt' => Carbon::now('Asia/Kuala_Lumpur'),
     ])->setPaper('a4', 'portrait');
 
-    // 4) Clean filename
+    // 5️⃣ Clean & safe filename
     $safeTitle = preg_replace('/[^A-Za-z0-9_\- ]/', '', $request->title);
     $safeTitle = trim(preg_replace('/\s+/', ' ', $safeTitle));
-    $filename  = "PadangPro_Report_" . str_replace(' ', '_', $safeTitle) . ".pdf";
+    $filename  = 'PadangPro_Report_' . str_replace(' ', '_', $safeTitle) . '.pdf';
 
+    // 6️⃣ Download
     return $pdf->download($filename);
 }
+
+
 
 }
 //

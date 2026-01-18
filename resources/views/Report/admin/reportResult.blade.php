@@ -267,14 +267,31 @@
 </form>
 @endif
 
+@php
+    $pdfMeta = [
+        "report_type" => $reportType,
+        "start_date"  => $request->start_date,
+        "end_date"    => $request->end_date,
+        "group_by"    => $request->group_by,
+        "field_id"    => $request->field_id,
+        "item_id"     => $request->item_id,
+    ];
+@endphp
+
 {{-- PDF DOWNLOAD FORM --}}
 <form id="pdfForm" action="{{ route('admin.reports.pdf') }}" method="POST" class="hidden">
     @csrf
-    <input type="hidden" name="chart_image" id="pdf_chart_image">
     <input type="hidden" name="title" value="{{ $customReportTitle }}">
     <input type="hidden" name="report_type" value="{{ $reportType }}">
     <input type="hidden" name="summary" value='@json($summaryData)'>
-    <input type="hidden" name="meta" value='@json($request->all())'>
+    <input type="hidden" name="meta" value='@json($pdfMeta)'>
+
+    {{-- TABLE DATA --}}
+    <input type="hidden" name="table_labels" value='@json($decodedLabels)'>
+    <input type="hidden" name="table_values" value='@json($decodedData)'>
+
+    {{-- INSIGHTS (OPTIONAL) --}}
+    <input type="hidden" name="insights" value='@json(array_values($summaryData ?? []))'>
 </form>
 
 @endsection
@@ -371,20 +388,15 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-// ===== DOWNLOAD PDF =====
-const downloadBtn = document.getElementById('downloadPdfBtn');
 
-if (downloadBtn) {
-    downloadBtn.addEventListener('click', function () {
-        const canvas = document.getElementById('customReportChart');
-        if (!canvas) return;
+    // ===== DOWNLOAD PDF =====
+    const downloadBtn = document.getElementById('downloadPdfBtn');
 
-        const imageData = canvas.toDataURL('image/png');
-        document.getElementById('pdf_chart_image').value = imageData;
-
-        document.getElementById('pdfForm').submit();
-    });
-}
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', function () {
+            document.getElementById('pdfForm').submit();
+        });
+    }
 
 });
 </script>
