@@ -4,17 +4,17 @@
 
 @section('content')
 
-<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 text-white pt-8 pb-24 px-10 rounded-lg shadow-lg">
+<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 text-white pt-8 pb-24 px-6 sm:px-10 rounded-lg shadow-lg">
     <h1 class="text-2xl font-bold">Custom Report Result</h1>
 </div>
 
-<div class="bg-white rounded-xl shadow-md border border-gray-100 p-8 w-11/12 mx-auto -mt-16 relative">
+<div class="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-8 w-[95%] sm:w-11/12 mx-auto -mt-16 relative overflow-hidden">
 
     {{-- HEADER --}}
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div class="min-w-0">
             <h2 class="text-xl font-bold text-gray-800 break-words">{{ $customReportTitle }}</h2>
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-sm text-gray-500 mt-1 break-words">
                 Generated on {{ \Carbon\Carbon::now('Asia/Kuala_Lumpur')->format('d M Y, h:i A') }}
                 @if($request->start_date && $request->end_date)
                     • Range: {{ \Carbon\Carbon::parse($request->start_date)->format('d M Y') }} → {{ \Carbon\Carbon::parse($request->end_date)->format('d M Y') }}
@@ -71,9 +71,11 @@
 
         {{-- QUICK KPI STRIP --}}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div class="rounded-xl border bg-amber-50/60 p-4">
+
+            {{-- TOTAL --}}
+            <div class="rounded-xl border bg-amber-50/60 p-4 overflow-hidden">
                 <p class="text-xs text-amber-700 font-semibold uppercase tracking-wide">Total</p>
-                <p class="text-2xl font-extrabold text-amber-900 mt-1">
+                <p class="text-2xl font-extrabold text-amber-900 mt-1 break-words">
                     {{ $summaryData['total'] ?? '—' }}
                 </p>
                 <p class="text-xs text-amber-700/80 mt-1">
@@ -81,19 +83,30 @@
                 </p>
             </div>
 
-            <div class="rounded-xl border bg-sky-50/60 p-4">
-                <p class="text-xs text-sky-700 font-semibold uppercase tracking-wide">Average</p>
-                <p class="text-2xl font-extrabold text-sky-900 mt-1">
-                    {{ $summaryData['average'] ?? '—' }}
+            {{-- DISTRIBUTION (REPLACES AVERAGE) --}}
+            <div class="rounded-xl border bg-sky-50/60 p-4 overflow-hidden">
+                <p class="text-xs text-sky-700 font-semibold uppercase tracking-wide">Distribution</p>
+
+                @php
+                    // Heuristic: if there is a named peak period/time, treat as more concentrated.
+                    // Otherwise, treat as more evenly distributed.
+                    $distributionLabel = (isset($summaryData['peak_period']) || isset($summaryData['busiest_time']))
+                        ? 'Peak Concentrated'
+                        : 'Evenly Distributed';
+                @endphp
+
+                <p class="text-lg font-extrabold text-sky-900 mt-1 break-words">
+                    {{ $distributionLabel }}
                 </p>
                 <p class="text-xs text-sky-700/80 mt-1">
-                    Helps understand consistency
+                    Indicates demand spread across the period
                 </p>
             </div>
 
-            <div class="rounded-xl border bg-emerald-50/60 p-4">
+            {{-- PEAK --}}
+            <div class="rounded-xl border bg-emerald-50/60 p-4 overflow-hidden">
                 <p class="text-xs text-emerald-700 font-semibold uppercase tracking-wide">Peak</p>
-                <p class="text-2xl font-extrabold text-emerald-900 mt-1">
+                <p class="text-base sm:text-lg font-extrabold text-emerald-900 mt-1 break-words">
                     @if(isset($summaryData['peak_period']))
                         {{ $summaryData['peak_period'] }}
                     @elseif(isset($summaryData['most_popular']))
@@ -114,16 +127,16 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
             {{-- CHART --}}
-            <div class="lg:col-span-2 bg-gray-50/70 p-4 rounded-xl border h-[460px]">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
+            <div class="lg:col-span-2 bg-gray-50/70 p-4 rounded-xl border h-[460px] overflow-hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                    <div class="min-w-0">
                         <p class="text-sm font-semibold text-gray-800">Visualization</p>
-                        <p class="text-xs text-gray-500">
+                        <p class="text-xs text-gray-500 break-words">
                             Interpreting trend and distribution for the selected criteria.
                         </p>
                     </div>
 
-                    <span class="text-xs px-3 py-1 rounded-full bg-white border text-gray-600">
+                    <span class="text-xs px-3 py-1 rounded-full bg-white border text-gray-600 shrink-0">
                         Report Type: <span class="font-semibold">{{ ucwords(str_replace('_',' ', $reportType)) }}</span>
                     </span>
                 </div>
@@ -132,21 +145,23 @@
             </div>
 
             {{-- SUMMARY --}}
-            <div class="bg-white rounded-xl border p-6">
+            <div class="bg-white rounded-xl border p-6 overflow-hidden">
                 <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">
                     Report Summary
                 </h3>
 
                 <div class="space-y-3 text-sm">
                     @forelse($summaryData as $label => $value)
-                        <div class="flex justify-between items-center gap-4">
-                            <span class="text-gray-600 capitalize whitespace-nowrap">
-                                {{ str_replace('_',' ', $label) }}:
-                            </span>
-                            <span class="font-bold text-gray-900 text-right">
-                                {{ $value }}
-                            </span>
-                        </div>
+                        @if($label !== 'average')
+                            <div class="flex justify-between items-start gap-4">
+                                <span class="text-gray-600 capitalize whitespace-nowrap">
+                                    {{ str_replace('_',' ', $label) }}:
+                                </span>
+                                <span class="font-bold text-gray-900 text-right break-words max-w-[65%]">
+                                    {{ $value }}
+                                </span>
+                            </div>
+                        @endif
                     @empty
                         <p class="text-gray-500">No summary available.</p>
                     @endforelse
@@ -157,7 +172,7 @@
                     <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide">How to read this</p>
                     <ul class="mt-2 text-sm text-gray-600 space-y-2 leading-relaxed">
                         <li>• <strong>Total</strong> shows the overall performance for the selected date range.</li>
-                        <li>• <strong>Average</strong> indicates consistency (stable vs spike-heavy activity).</li>
+                        <li>• <strong>Distribution</strong> indicates whether demand is evenly spread or concentrated at specific periods.</li>
                         <li>• <strong>Peak</strong> highlights the period/category with the highest demand contribution.</li>
                     </ul>
                 </div>
@@ -166,29 +181,25 @@
 
         {{-- BOOKING INSIGHT --}}
         @if(in_array($reportType, ['booking_revenue','booking_count','field_performance','peak_hours']))
-            <div class="mt-10 bg-emerald-50 border border-emerald-200 rounded-xl p-6">
+            <div class="mt-10 bg-emerald-50 border border-emerald-200 rounded-xl p-6 overflow-hidden">
                 <h3 class="text-lg font-bold text-emerald-800 mb-3">📈 Booking Insights</h3>
 
-                <ul class="space-y-2 text-sm text-emerald-900 leading-relaxed">
+                <ul class="space-y-2 text-sm text-emerald-900 leading-relaxed break-words">
                     @if($reportType === 'booking_revenue')
                         <li>• The total booking revenue reflects the <strong>overall financial performance</strong> of pitch reservations in this period.</li>
-                        @if(isset($summaryData['average']))
-                            <li>• The average daily revenue indicates how <strong>consistent demand</strong> is, useful for forecasting and cash-flow planning.</li>
-                        @endif
                         @if(isset($summaryData['peak_period']))
                             <li>• Revenue peaked at <strong>{{ $summaryData['peak_period'] }}</strong>, suggesting demand concentration that may support <strong>pricing optimisation</strong> (peak vs off-peak).</li>
                         @endif
+                        <li>• The distribution indicator helps highlight whether bookings are clustered around certain dates (spike-heavy) or stable across the period.</li>
                         <li>• Consider promotions for low-performing days to improve utilisation without affecting peak demand.</li>
                     @endif
 
                     @if($reportType === 'booking_count')
                         <li>• Total bookings indicate the <strong>volume of customer activity</strong> for this period.</li>
-                        @if(isset($summaryData['average']))
-                            <li>• Average bookings/day help you understand <strong>demand stability</strong>, supporting staffing and facility readiness planning.</li>
-                        @endif
                         @if(isset($summaryData['peak_period']))
                             <li>• The busiest period is <strong>{{ $summaryData['peak_period'] }}</strong>, which may require better slot management and on-site coordination.</li>
                         @endif
+                        <li>• If demand is peak-concentrated, planning staff and facility readiness around those spikes can reduce congestion.</li>
                     @endif
 
                     @if($reportType === 'field_performance')
@@ -212,15 +223,11 @@
 
         {{-- RENTAL INSIGHT --}}
         @if(in_array($reportType, ['rental_revenue', 'item_popularity']))
-            <div class="mt-10 bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <div class="mt-10 bg-blue-50 border border-blue-200 rounded-xl p-6 overflow-hidden">
                 <h3 class="text-lg font-bold text-blue-800 mb-3">📊 Rental Insights</h3>
 
-                <ul class="space-y-2 text-sm text-blue-900 leading-relaxed">
+                <ul class="space-y-2 text-sm text-blue-900 leading-relaxed break-words">
                     <li>• Rental activity during this period indicates <strong>customer demand for equipment</strong>, supporting inventory decisions.</li>
-
-                    @if(isset($summaryData['average']))
-                        <li>• Average daily rental revenue suggests a <strong>predictable income pattern</strong> useful for stock planning.</li>
-                    @endif
 
                     @if(isset($summaryData['peak_period']))
                         <li>• Rental contribution peaked at <strong>{{ $summaryData['peak_period'] }}</strong>, indicating a window of higher equipment usage.</li>
@@ -230,6 +237,7 @@
                         <li>• The most popular item is <strong>{{ $summaryData['most_popular'] }}</strong>, which should be prioritised for <strong>restocking and maintenance</strong>.</li>
                     @endif
 
+                    <li>• If demand is peak-concentrated, consider preparing inventory before those peak windows to avoid shortages.</li>
                     <li>• Consider adjusting rental prices for high-demand items to improve profitability while maintaining availability.</li>
                 </ul>
             </div>
@@ -271,7 +279,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const type = '{{ $reportType }}';
 
     let chartType = 'line';
-
     if (type === 'field_performance') chartType = 'doughnut';
     if (type === 'peak_hours') chartType = 'bar';
     if (type === 'item_popularity') chartType = 'bar';
