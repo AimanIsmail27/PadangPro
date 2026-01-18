@@ -35,6 +35,9 @@
 </head>
 <body class="bg-slate-100 font-sans flex min-h-screen">
 
+    @include('layout.partials.page-loader')
+
+
     <div id="sidebarOverlay" onclick="toggleSidebar()" 
          class="fixed inset-0 bg-black/50 z-20 hidden lg:hidden opacity-0 pointer-events-none transition-opacity"></div>
 

@@ -196,6 +196,8 @@ footer {
 </head>
 
 <body>
+        @include('layout.partials.page-loader')
+
 
 <!-- MOBILE OVERLAY -->
 <div id="sidebarOverlay" onclick="toggleSidebar()"></div>

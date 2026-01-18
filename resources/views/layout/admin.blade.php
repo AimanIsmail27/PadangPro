@@ -242,6 +242,8 @@
     </style>
 </head>
 <body>
+    @include('layout.partials.page-loader')
+
     <!-- Overlay for mobile -->
     <div id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
