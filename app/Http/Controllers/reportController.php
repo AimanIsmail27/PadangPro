@@ -189,181 +189,304 @@ class ReportController extends Controller
      * Generate and show the custom report result.
      */
     public function show(Request $request)
-    {
-        $viewContext = $this->getViewContext();
-        
-        // 1. Validation
-        $request->validate([
-            'report_type' => 'required|string',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-        ]);
+{
+    $viewContext = $this->getViewContext();
 
-        // 2. Variable Setup (Unchanged)
-        $startDate = Carbon::parse($request->start_date)->startOfDay();
-        $endDate = Carbon::parse($request->end_date)->endOfDay();
-        $reportType = $request->report_type;
-        $groupBy = $request->input('group_by', 'day');
-        $customReportTitle = ucwords(str_replace('_', ' ', $reportType)) . " from " . $startDate->format('M j, Y') . " to " . $endDate->format('M j, Y');
-        
-        // 3. Determine Report Category & Initialize (Unchanged)
-        $isBookingReport = in_array($reportType, ['booking_revenue', 'booking_count', 'field_performance', 'peak_hours']);
-        $isRentalReport = in_array($reportType, ['rental_revenue', 'item_popularity']);
-        $results = collect();
+    // 1. Validation
+    $request->validate([
+        'report_type' => 'required|string',
+        'start_date'  => 'required|date',
+        'end_date'    => 'required|date|after_or_equal:start_date',
+    ]);
 
-        // 4. Build & Execute Queries (Unchanged - this logic is identical for admin/staff)
-        if ($isBookingReport) {
-            $query = Slot::whereBetween('slot_Date', [$startDate, $endDate]);
-            $dateColumn = 'slot_Date';
-            if ($request->filled('field_id') && $reportType !== 'field_performance') {
-                $query->where('slot.fieldID', $request->field_id);
-                $field = Field::find($request->field_id);
-                if ($field) $customReportTitle .= ' for ' . $field->field_Label;
-            }
-            switch ($reportType) {
-                case 'booking_revenue':
-                case 'booking_count':
-                    $dateFormat = match ($groupBy) { 'month' => '%Y-%m', 'week' => '%Y-%u', default => '%Y-%m-%d' };
-                    $value_expression = ($reportType === 'booking_revenue') ? 'SUM(slot.slot_Price)' : 'COUNT(*)';
-                    $query->join('booking', 'slot.slotID', '=', 'booking.slotID')->where('booking.booking_Status', 'paid')->select(DB::raw("DATE_FORMAT($dateColumn, '$dateFormat') as period"), DB::raw("$value_expression as value"));
-                    $results = $query->groupBy('period')->orderBy('period', 'asc')->get();
-                    break;
-                case 'field_performance':
-                    $query->join('booking', 'slot.slotID', '=', 'booking.slotID')->join('field', 'slot.fieldID', '=', 'field.fieldID')->where('booking.booking_Status', 'paid')->select('field.field_Label as label', DB::raw('COUNT(booking.bookingID) as value'));
-                    $results = $query->groupBy('label')->orderBy('value', 'desc')->get();
-                    break;
-                case 'peak_hours':
-                    $query->join('booking', 'slot.slotID', '=', 'booking.slotID')->where('booking.booking_Status', 'paid')->select('slot.slot_Time as label', DB::raw('COUNT(booking.bookingID) as value'));
-                    $results = $query->groupBy('label')->get();
-                    break;
-            }
-        }
-        if ($isRentalReport) {
-            $query = Rental::where('rental_Status', 'paid')->where('rental_StartDate', '<=', $endDate)->where('rental_EndDate', '>=', $startDate);
-            if ($request->filled('item_id')) {
-                $query->where('rental.itemID', $request->item_id);
-                $item = Item::find($request->item_id);
-                if ($item) $customReportTitle .= ' for ' . $item->item_Name;
-            }
-            switch ($reportType) {
-                case 'rental_revenue':
-                    $results = $query->with('item')->get();
-                    break;
-                case 'item_popularity':
-                    $query->join('item', 'rental.itemID', '=', 'item.itemID')->select('item.item_Name as label', DB::raw('SUM(rental.quantity) as value'));
-                    $results = $query->groupBy('label')->orderBy('value', 'desc')->get();
-                    break;
-            }
-        }
-        
-        // 5. Prepare Data for Chart.js (Unchanged)
-        $isCategorical = in_array($reportType, ['field_performance', 'peak_hours', 'item_popularity']);
-        if ($reportType === 'rental_revenue') {
-            $dailyRevenue = [];
-            $period = new \DatePeriod(clone $startDate, new \DateInterval('P1D'), clone $endDate->addDay());
-            foreach ($period as $date) { $dailyRevenue[$date->format('Y-m-d')] = 0; }
-            foreach ($results as $rental) {
-                if (!$rental->item) continue;
-                $rentalStart = Carbon::parse($rental->rental_StartDate);
-                $rentalEnd = Carbon::parse($rental->rental_EndDate);
-                $rentalDays = $rentalStart->diffInDays($rentalEnd) + 1;
-                $totalPrice = $rental->quantity * $rental->item->item_Price * $rentalDays;
-                $dailyPrice = ($rentalDays > 0) ? $totalPrice / $rentalDays : 0;
-                $rentalPeriod = new \DatePeriod($rentalStart, new \DateInterval('P1D'), $rentalEnd->addDay());
-                foreach ($rentalPeriod as $day) {
-                    $dayString = $day->format('Y-m-d');
-                    if (isset($dailyRevenue[$dayString])) {
-                        $dailyRevenue[$dayString] += $dailyPrice;
-                    }
-                }
-            }
-            $customChartLabels = json_encode(array_map(fn($date) => Carbon::parse($date)->format('M j'), array_keys($dailyRevenue)));
-            $customChartData = json_encode(array_values($dailyRevenue));
-        } elseif ($isCategorical) {
-            if ($reportType === 'peak_hours') {
-                $allTimeSlots = ['08:00:00', '10:00:00', '12:00:00', '14:00:00', '16:00:00', '18:00:00', '20:00:00', '22:00:00'];
-                $chartLabels = []; $chartData = [];
-                foreach ($allTimeSlots as $time) {
-                    $chartLabels[] = Carbon::parse($time)->format('h:i A');
-                    $resultForTime = $results->firstWhere('label', $time);
-                    $chartData[] = $resultForTime ? $resultForTime->value : 0;
-                }
-                $customChartLabels = json_encode($chartLabels);
-                $customChartData = json_encode($chartData);
-            } else {
-                $customChartLabels = json_encode($results->pluck('label'));
-                $customChartData = json_encode($results->pluck('value'));
-            }
-        } else {
-            $labels = match ($groupBy) {
-                'week' => $results->pluck('period')->map(fn($p) => "Week " . substr($p, 5, 2)),
-                'month' => $results->pluck('period')->map(fn($p) => Carbon::parse($p)->format('M Y')),
-                default => $results->pluck('period')->map(fn($p) => Carbon::parse($p)->format('M j')),
-            };
-            $customChartLabels = json_encode($labels);
-            $customChartData = json_encode($results->pluck('value'));
+    // 2. Variable Setup
+    $startDate = Carbon::parse($request->start_date)->startOfDay();
+    $endDate   = Carbon::parse($request->end_date)->endOfDay();
+    $reportType = $request->report_type;
+    $groupBy    = $request->input('group_by', 'day');
+
+    $customReportTitle = ucwords(str_replace('_', ' ', $reportType)) .
+        " from " . $startDate->format('M j, Y') .
+        " to " . $endDate->format('M j, Y');
+
+    // 3. Determine Report Category & Initialize
+    $isBookingReport = in_array($reportType, ['booking_revenue', 'booking_count', 'field_performance', 'peak_hours']);
+    $isRentalReport  = in_array($reportType, ['rental_revenue', 'item_popularity']);
+    $results = collect();
+
+    // Statuses considered "successful revenue"
+    $validPaymentStatuses = ['paid', 'paid_balance', 'paid_balance (cash)'];
+
+    /*
+    |----------------------------------------------------------------------
+    | 4. Build & Execute Queries
+    |----------------------------------------------------------------------
+    */
+    if ($isBookingReport) {
+
+        // Base: filter by SERVICE DATE (slot date) as you requested
+        $query = Slot::whereBetween('slot.slot_Date', [$startDate, $endDate]);
+        $dateColumn = 'slot.slot_Date';
+
+        // Optional field filter (not for field_performance)
+        if ($request->filled('field_id') && $reportType !== 'field_performance') {
+            $query->where('slot.fieldID', $request->field_id);
+            $field = Field::find($request->field_id);
+            if ($field) $customReportTitle .= ' for ' . $field->field_Label;
         }
 
-        // 6. Calculate Summary Data (Unchanged)
-        $summaryData = [];
-        $dataValues = collect(json_decode($customChartData));
-        $labelValues = collect(json_decode($customChartLabels));
-        if ($dataValues->isNotEmpty()) {
-            $sum = $dataValues->sum();
-            $peakValue = $dataValues->max();
-            $peakIndices = $dataValues->keys()->filter(fn($key) => $dataValues[$key] == $peakValue);
-            switch ($reportType) {
-                case 'booking_revenue':
-                case 'rental_revenue':
-                    $divisor = $endDate->diffInDays($startDate) + 1;
-                    $average = ($divisor > 0) ? $sum / $divisor : 0;
-                    $summaryData['total'] = "RM " . number_format($sum, 2);
-                    $summaryData['average'] = "RM " . number_format($average, 2);
-                    if ($peakIndices->isNotEmpty()) {
-                        $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index])->implode(', ');
-                        $summaryData['peak_period'] = $peakLabels . " (RM " . number_format($peakValue, 2) . ")";
-                    }
-                    break;
-                case 'booking_count':
-                    $divisor = $endDate->diffInDays($startDate) + 1;
-                    $average = ($divisor > 0) ? $sum / $divisor : 0;
-                    $summaryData['total'] = intval($sum) . " Bookings";
-                    $summaryData['average'] = number_format($average, 1);
-                    if ($peakIndices->isNotEmpty()) {
-                        $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index])->implode(', ');
-                        $summaryData['peak_period'] = $peakLabels . " (" . intval($peakValue) . " bookings)";
-                    }
-                    break;
-                case 'field_performance':
-                case 'item_popularity':
-                    $summaryData['total'] = intval($sum) . ($reportType === 'field_performance' ? " Bookings" : " Items Rented");
-                    if ($peakIndices->isNotEmpty()) {
-                        $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index])->implode(', ');
-                        $summaryData['most_popular'] = $peakLabels . " (" . intval($peakValue) . ")";
-                    }
-                    break;
-                case 'peak_hours':
-                    $summaryData['total'] = intval($sum) . " Bookings";
-                    if ($peakIndices->isNotEmpty()) {
-                        $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index])->implode(', ');
-                        $summaryData['busiest_time'] = $peakLabels . " (" . intval($peakValue) . " bookings)";
-                    }
-                    break;
-            }
+        switch ($reportType) {
+
+            case 'booking_revenue':
+                // Group by day/week/month based on slot date, but SUM payment amounts
+                $dateFormat = match ($groupBy) {
+                    'month' => '%Y-%m',
+                    'week'  => '%Y-%u',
+                    default => '%Y-%m-%d'
+                };
+
+                $results = $query
+                    ->join('booking', 'slot.slotID', '=', 'booking.slotID')
+                    ->join('payment', 'payment.bookingID', '=', 'booking.bookingID')
+                    ->whereIn('payment.payment_Status', $validPaymentStatuses)
+                    // Optional: if you only want revenue for bookings that are at least "paid/completed"
+                    ->whereIn('booking.booking_Status', ['paid', 'completed'])
+                    ->select(
+                        DB::raw("DATE_FORMAT($dateColumn, '$dateFormat') as period"),
+                        DB::raw("SUM(payment.payment_Amount) as value")
+                    )
+                    ->groupBy('period')
+                    ->orderBy('period', 'asc')
+                    ->get();
+                break;
+
+            case 'booking_count':
+                // Count bookings based on slot date (service date)
+                $dateFormat = match ($groupBy) {
+                    'month' => '%Y-%m',
+                    'week'  => '%Y-%u',
+                    default => '%Y-%m-%d'
+                };
+
+                $results = $query
+                    ->join('booking', 'slot.slotID', '=', 'booking.slotID')
+                    ->whereIn('booking.booking_Status', ['paid', 'completed'])
+                    ->select(
+                        DB::raw("DATE_FORMAT($dateColumn, '$dateFormat') as period"),
+                        DB::raw("COUNT(DISTINCT booking.bookingID) as value")
+                    )
+                    ->groupBy('period')
+                    ->orderBy('period', 'asc')
+                    ->get();
+                break;
+
+            case 'field_performance':
+                // Most booked fields (within slot date range)
+                $results = $query
+                    ->join('booking', 'slot.slotID', '=', 'booking.slotID')
+                    ->join('field', 'slot.fieldID', '=', 'field.fieldID')
+                    ->whereIn('booking.booking_Status', ['paid', 'completed'])
+                    ->select(
+                        'field.field_Label as label',
+                        DB::raw('COUNT(DISTINCT booking.bookingID) as value')
+                    )
+                    ->groupBy('label')
+                    ->orderBy('value', 'desc')
+                    ->get();
+                break;
+
+            case 'peak_hours':
+                // Busiest slot times (within slot date range)
+                $results = $query
+                    ->join('booking', 'slot.slotID', '=', 'booking.slotID')
+                    ->whereIn('booking.booking_Status', ['paid', 'completed'])
+                    ->select(
+                        'slot.slot_Time as label',
+                        DB::raw('COUNT(DISTINCT booking.bookingID) as value')
+                    )
+                    ->groupBy('label')
+                    ->get();
+                break;
         }
-        
-        // 7. Return the View
-        // --- THIS IS THE FIX: Return the correct view based on role ---
-        return view($viewContext->view_path . '.reportResult', [
-            'customReportTitle' => $customReportTitle,
-            'customChartLabels' => $customChartLabels,
-            'customChartData' => $customChartData,
-            'reportType' => $reportType,
-            'request' => $request,
-            'summaryData' => $summaryData,
-            'groupBy' => $groupBy,
-        ]);
     }
+
+    if ($isRentalReport) {
+
+        $query = Rental::where('rental_Status', 'paid')
+            ->where('rental_StartDate', '<=', $endDate)
+            ->where('rental_EndDate', '>=', $startDate);
+
+        if ($request->filled('item_id')) {
+            $query->where('rental.itemID', $request->item_id);
+            $item = Item::find($request->item_id);
+            if ($item) $customReportTitle .= ' for ' . $item->item_Name;
+        }
+
+        switch ($reportType) {
+            case 'rental_revenue':
+                // Keep your original logic (uses item price over rental duration)
+                $results = $query->with('item')->get();
+                break;
+
+            case 'item_popularity':
+                $results = $query
+                    ->join('item', 'rental.itemID', '=', 'item.itemID')
+                    ->select(
+                        'item.item_Name as label',
+                        DB::raw('SUM(rental.quantity) as value')
+                    )
+                    ->groupBy('label')
+                    ->orderBy('value', 'desc')
+                    ->get();
+                break;
+        }
+    }
+
+    /*
+    |----------------------------------------------------------------------
+    | 5. Prepare Data for Chart.js (keep your original logic)
+    |----------------------------------------------------------------------
+    */
+    $isCategorical = in_array($reportType, ['field_performance', 'peak_hours', 'item_popularity']);
+
+    if ($reportType === 'rental_revenue') {
+        $dailyRevenue = [];
+        $period = new \DatePeriod(clone $startDate, new \DateInterval('P1D'), clone $endDate->copy()->addDay());
+
+        foreach ($period as $date) {
+            $dailyRevenue[$date->format('Y-m-d')] = 0;
+        }
+
+        foreach ($results as $rental) {
+            if (!$rental->item) continue;
+
+            $rentalStart = Carbon::parse($rental->rental_StartDate);
+            $rentalEnd   = Carbon::parse($rental->rental_EndDate);
+            $rentalDays  = $rentalStart->diffInDays($rentalEnd) + 1;
+
+            $totalPrice = $rental->quantity * $rental->item->item_Price * $rentalDays;
+            $dailyPrice = ($rentalDays > 0) ? $totalPrice / $rentalDays : 0;
+
+            $rentalPeriod = new \DatePeriod($rentalStart, new \DateInterval('P1D'), $rentalEnd->copy()->addDay());
+            foreach ($rentalPeriod as $day) {
+                $dayString = $day->format('Y-m-d');
+                if (isset($dailyRevenue[$dayString])) {
+                    $dailyRevenue[$dayString] += $dailyPrice;
+                }
+            }
+        }
+
+        $customChartLabels = json_encode(array_map(fn($date) => Carbon::parse($date)->format('M j'), array_keys($dailyRevenue)));
+        $customChartData   = json_encode(array_values($dailyRevenue));
+
+    } elseif ($isCategorical) {
+
+        if ($reportType === 'peak_hours') {
+            $allTimeSlots = ['08:00:00', '10:00:00', '12:00:00', '14:00:00', '16:00:00', '18:00:00', '20:00:00', '22:00:00'];
+
+            $chartLabels = [];
+            $chartData = [];
+
+            foreach ($allTimeSlots as $time) {
+                $chartLabels[] = Carbon::parse($time)->format('h:i A');
+                $resultForTime = $results->firstWhere('label', $time);
+                $chartData[] = $resultForTime ? (float) $resultForTime->value : 0;
+            }
+
+            $customChartLabels = json_encode($chartLabels);
+            $customChartData   = json_encode($chartData);
+
+        } else {
+            $customChartLabels = json_encode($results->pluck('label'));
+            $customChartData   = json_encode($results->pluck('value'));
+        }
+
+    } else {
+        $labels = match ($groupBy) {
+            'week'  => $results->pluck('period')->map(fn($p) => "Week " . substr($p, 5, 2)),
+            'month' => $results->pluck('period')->map(fn($p) => Carbon::parse($p . '-01')->format('M Y')),
+            default => $results->pluck('period')->map(fn($p) => Carbon::parse($p)->format('M j')),
+        };
+
+        $customChartLabels = json_encode($labels);
+        $customChartData   = json_encode($results->pluck('value'));
+    }
+
+    /*
+    |----------------------------------------------------------------------
+    | 6. Calculate Summary Data (your original logic)
+    |----------------------------------------------------------------------
+    */
+    $summaryData = [];
+    $dataValues  = collect(json_decode($customChartData, true) ?? []);
+    $labelValues = collect(json_decode($customChartLabels, true) ?? []);
+
+    if ($dataValues->isNotEmpty()) {
+        $sum = $dataValues->sum();
+        $peakValue = $dataValues->max();
+        $peakIndices = $dataValues->keys()->filter(fn($key) => $dataValues[$key] == $peakValue);
+
+        switch ($reportType) {
+            case 'booking_revenue':
+            case 'rental_revenue':
+                $divisor = $endDate->diffInDays($startDate) + 1;
+                $average = ($divisor > 0) ? $sum / $divisor : 0;
+
+                $summaryData['total'] = "RM " . number_format($sum, 2);
+                $summaryData['average'] = "RM " . number_format($average, 2);
+
+                if ($peakIndices->isNotEmpty()) {
+                    $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index] ?? '')->implode(', ');
+                    $summaryData['peak_period'] = $peakLabels . " (RM " . number_format($peakValue, 2) . ")";
+                }
+                break;
+
+            case 'booking_count':
+                $divisor = $endDate->diffInDays($startDate) + 1;
+                $average = ($divisor > 0) ? $sum / $divisor : 0;
+
+                $summaryData['total'] = intval($sum) . " Bookings";
+                $summaryData['average'] = number_format($average, 1);
+
+                if ($peakIndices->isNotEmpty()) {
+                    $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index] ?? '')->implode(', ');
+                    $summaryData['peak_period'] = $peakLabels . " (" . intval($peakValue) . " bookings)";
+                }
+                break;
+
+            case 'field_performance':
+            case 'item_popularity':
+                $summaryData['total'] = intval($sum) . ($reportType === 'field_performance' ? " Bookings" : " Items Rented");
+
+                if ($peakIndices->isNotEmpty()) {
+                    $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index] ?? '')->implode(', ');
+                    $summaryData['most_popular'] = $peakLabels . " (" . intval($peakValue) . ")";
+                }
+                break;
+
+            case 'peak_hours':
+                $summaryData['total'] = intval($sum) . " Bookings";
+
+                if ($peakIndices->isNotEmpty()) {
+                    $peakLabels = $peakIndices->map(fn($index) => $labelValues[$index] ?? '')->implode(', ');
+                    $summaryData['busiest_time'] = $peakLabels . " (" . intval($peakValue) . " bookings)";
+                }
+                break;
+        }
+    }
+
+    // 7. Return View
+    return view($viewContext->view_path . '.reportResult', [
+        'customReportTitle'  => $customReportTitle,
+        'customChartLabels'  => $customChartLabels,
+        'customChartData'    => $customChartData,
+        'reportType'         => $reportType,
+        'request'            => $request,
+        'summaryData'        => $summaryData,
+        'groupBy'            => $groupBy,
+    ]);
+}
+
 
     public function publish(Request $request)
     {
@@ -453,3 +576,4 @@ public function getBookingForecast()
 }
 
 }
+//
