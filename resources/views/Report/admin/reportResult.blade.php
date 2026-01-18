@@ -29,11 +29,18 @@
         </div>
 
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
-            @if(!$request->has('view_only'))
+        {{-- DOWNLOAD PDF (ALWAYS AVAILABLE) --}}
+        <button id="downloadPdfBtn"
+                class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition w-full sm:w-auto">
+            Download PDF
+        </button>
+    
+        @if(!$request->has('view_only'))
                 <button id="publishReportBtn"
                         class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition w-full sm:w-auto">
                     Publish this Report
                 </button>
+                
 
                 <a href="{{ route('admin.reports.create', $request->query()) }}"
                    class="text-sm text-amber-700 hover:text-amber-900 font-semibold text-center w-full sm:w-auto">
@@ -260,6 +267,16 @@
 </form>
 @endif
 
+{{-- PDF DOWNLOAD FORM --}}
+<form id="pdfForm" action="{{ route('admin.reports.pdf') }}" method="POST" class="hidden">
+    @csrf
+    <input type="hidden" name="chart_image" id="pdf_chart_image">
+    <input type="hidden" name="title" value="{{ $customReportTitle }}">
+    <input type="hidden" name="report_type" value="{{ $reportType }}">
+    <input type="hidden" name="summary" value='@json($summaryData)'>
+    <input type="hidden" name="meta" value='@json($request->all())'>
+</form>
+
 @endsection
 
 @push('scripts')
@@ -354,6 +371,20 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
+// ===== DOWNLOAD PDF =====
+const downloadBtn = document.getElementById('downloadPdfBtn');
+
+if (downloadBtn) {
+    downloadBtn.addEventListener('click', function () {
+        const canvas = document.getElementById('customReportChart');
+        if (!canvas) return;
+
+        const imageData = canvas.toDataURL('image/png');
+        document.getElementById('pdf_chart_image').value = imageData;
+
+        document.getElementById('pdfForm').submit();
+    });
+}
 
 });
 </script>

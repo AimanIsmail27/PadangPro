@@ -13,6 +13,8 @@ use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 
 class ReportController extends Controller
 {
@@ -559,6 +561,42 @@ public function getBookingForecast()
             'error' => 'Unexpected server error.'
         ], 500);
     }
+}
+public function downloadPdf(Request $request)
+{
+    // 1) Validate
+    $request->validate([
+        'chart_image' => 'required|string',
+        'title'       => 'required|string',
+        'report_type' => 'required|string',
+        'summary'     => 'nullable|string',
+        'meta'        => 'nullable|string',
+        'insights'    => 'nullable|string',
+    ]);
+
+
+    // 2) Decode JSON safely
+    $summaryData = json_decode($request->summary, true) ?? [];
+    $meta = json_decode($request->meta, true) ?? [];
+    $insights = json_decode($request->insights, true) ?? [];
+
+    // 3) Render PDF blade
+    $pdf = Pdf::loadView('Report.admin.reportPdf', [
+        'title'       => $request->title,
+        'reportType'  => $request->report_type,
+        'chartImage'  => $request->chart_image,
+        'summaryData' => $summaryData,
+        'meta'        => $meta,
+        'insights'    => $insights,
+        'generatedAt' => Carbon::now('Asia/Kuala_Lumpur'),
+    ])->setPaper('a4', 'portrait');
+
+    // 4) Clean filename
+    $safeTitle = preg_replace('/[^A-Za-z0-9_\- ]/', '', $request->title);
+    $safeTitle = trim(preg_replace('/\s+/', ' ', $safeTitle));
+    $filename  = "PadangPro_Report_" . str_replace(' ', '_', $safeTitle) . ".pdf";
+
+    return $pdf->download($filename);
 }
 
 }

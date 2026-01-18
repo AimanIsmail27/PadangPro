@@ -235,7 +235,9 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
         Route::post('/publish', [reportController::class, 'publish'])->name('publish');
         Route::get('/published', [reportController::class, 'publishedList'])->name('published');
         Route::get('/forecast', [reportController::class, 'getBookingForecast'])->name('forecast');
-    });
+        Route::post('/pdf', [reportController::class, 'downloadPdf'])
+            ->name('pdf');    
+        });
 
     // --- ADMIN: Staff Management ---
     Route::middleware('role:administrator')->group(function () {
