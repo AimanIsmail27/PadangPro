@@ -247,7 +247,7 @@ public function dashboard()
         // 4. Get Data for "Monthly Bookings" Chart
         $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
         $monthlyData = Booking::where('userID', $userId)
-            ->where('booking_Status', 'paid')
+            ->whereIn('booking_Status', ['paid', 'completed'])
             ->where('booking_CreatedAt', '>=', $sixMonthsAgo)
             ->select(DB::raw('COUNT(*) as count'), DB::raw('DATE_FORMAT(booking_CreatedAt, "%Y-%m") as month'))
             ->groupBy('month')->orderBy('month', 'asc')->get();
