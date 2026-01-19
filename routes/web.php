@@ -208,6 +208,19 @@ Route::get('/payment/rental/balance/{rentalID}', [PaymentController::class, 'cre
         Route::get('/{fieldID}/slots-json', [bookingController::class, 'getSlotsJson'])->name('slots.json');
         Route::post('/{bookingID}/mark-completed', [PaymentController::class, 'markAsCompleted'])
         ->name('payment.markCompleted');
+        // --- Slot Price Management (Admin only) ---
+        Route::get('/slot/{slotID}/price/edit', [bookingController::class, 'editSlotPrice'])->name('slot.price.edit');
+        Route::put('/slot/{slotID}/price', [bookingController::class, 'updateSlotPrice'])->name('slot.price.update');
+
+        Route::get('/slot/price/bulk', [bookingController::class, 'bulkSlotPriceForm'])->name('slot.price.bulkForm');
+        Route::post('/slot/price/bulk', [bookingController::class, 'bulkSlotPriceUpdate'])->name('slot.price.bulkUpdate');
+        // --- Slot Price Management (Calendar Multi-Select) ---
+        Route::get('/slot-price/manage/{fieldID?}', [bookingController::class, 'manageSlotPrices'])
+            ->name('slot.price.manage');
+
+        Route::post('/slot-price/update-selected', [bookingController::class, 'updateSelectedSlotPrices'])
+            ->name('slot.price.updateSelected');
+
     });
 
     // --- ADMIN: Rental Route ---

@@ -262,6 +262,11 @@
                         <li><a class="dropdown-item" href="{{ route('admin.booking.viewAll') }}">View All Bookings</a></li>
                         <li><a class="dropdown-item" href="{{ route('admin.booking.manage') }}">Book Standard Pitch</a></li>
                         <li><a class="dropdown-item" href="{{ route('admin.booking.mini') }}">Book Mini Pitch</a></li>
+                        <li>
+            <a class="dropdown-item" href="{{ route('admin.booking.slot.price.manage') }}">
+                Manage Slot Prices
+            </a>
+        </li>
                     </ul>
                 </li>
                 <li class="nav-item"><a href="{{ route('admin.rentals.current') }}" class="{{ (request()->routeIs('admin.rentals.current')) ? 'active' : '' }}"><i class="bi bi-tags-fill mr-2"></i>🏷️ View Rentals</a></li>

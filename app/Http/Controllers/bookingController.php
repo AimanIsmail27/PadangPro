@@ -495,6 +495,20 @@ class BookingController extends Controller
                         $color  = '#dc3545';
                     }
                 }
+
+                // --- NEW: Detect if price has been changed (override) ---
+                $hour = (int) Carbon::parse($slot->slot_Time)->format('H');
+
+                if ($field && $field->field_Size === "MINI SIZED FOOTBALL PITCH(9'S)") {
+                    $defaultPrice = ($hour >= 8 && $hour < 16) ? 350 : 400;
+                } else {
+                    if ($hour >= 8 && $hour < 16) $defaultPrice = 450;
+                    elseif ($hour >= 16 && $hour < 20) $defaultPrice = 500;
+                    else $defaultPrice = 550;
+                }
+
+                $priceChanged = ((float) ($slot->slot_Price ?? 0)) !== ((float) $defaultPrice);
+
                 $slotsForCalendar[] = [
                     'id' => $slot->slotID,
                     'title' => $status === 'past' ? 'Past Slot' : ucfirst($status),
@@ -504,6 +518,8 @@ class BookingController extends Controller
                     'status' => $status,
                     'slotId' => $slot->slotID,
                     'price' => $slot->slot_Price,
+                    'defaultPrice' => $defaultPrice,   // ✅ NEW
+                    'priceChanged' => $priceChanged,   // ✅ NEW
                     'time' => $slot->slot_Time,
                     'date' => $slot->slot_Date,
                     'field' => $field ? $field->field_Label : ''
@@ -624,5 +640,226 @@ class BookingController extends Controller
         $slotsForCalendar = $this->prepareSlotsForCalendar($fieldID);
         return response()->json($slotsForCalendar);
     }
-    
+
+    /**
+     * Check whether a slot has an active booking
+     */
+    private function isSlotBooked($slotID)
+    {
+        return Booking::where('slotID', $slotID)
+            ->where(function ($q) {
+                $q->whereIn('booking_Status', ['paid', 'confirmed', 'completed'])
+                ->orWhere(function ($q2) {
+                    $q2->where('booking_Status', 'pending')
+                        ->where('booking_CreatedAt', '>=', now()->subMinutes(10));
+                });
+            })
+            ->exists();
+    }
+
+    public function editSlotPrice($slotID)
+    {
+        $viewContext = $this->getViewContext();
+
+        // Admin only
+        if (!$viewContext->is_admin_or_staff || $viewContext->user_type !== 'admin') {
+            abort(403);
+        }
+
+        $slot = Slot::with('field')->findOrFail($slotID);
+
+        // Prevent editing past slots (optional but recommended)
+        $slotDateTime = Carbon::parse(
+            $slot->slot_Date . ' ' . $slot->slot_Time,
+            'Asia/Kuala_Lumpur'
+        );
+
+        if ($slotDateTime->lt(now('Asia/Kuala_Lumpur'))) {
+            return redirect()->back()->with('error', 'Cannot edit price for past slots.');
+        }
+
+        // Prevent editing booked slots
+        if ($this->isSlotBooked($slotID)) {
+            return redirect()->back()->with('error', 'This slot is already booked.');
+        }
+
+        return view('Booking.admin.editSlotPrice', compact('slot'));
+    }
+
+        public function updateSlotPrice(Request $request, $slotID)
+    {
+        $viewContext = $this->getViewContext();
+
+        // Admin only
+        if (!$viewContext->is_admin_or_staff || $viewContext->user_type !== 'admin') {
+            abort(403);
+        }
+
+        $slot = Slot::findOrFail($slotID);
+
+        // Prevent update if booked
+        if ($this->isSlotBooked($slotID)) {
+            return redirect()->back()->with('error', 'This slot is already booked.');
+        }
+
+        $request->validate([
+            'slot_Price' => 'required|numeric|min:1|max:9999',
+        ]);
+
+        $slot->update([
+            'slot_Price' => $request->slot_Price,
+        ]);
+
+        return redirect()
+            ->back()
+            ->with('success', 'Slot price updated successfully.');
+    }
+
+    public function bulkSlotPriceForm()
+    {
+        $viewContext = $this->getViewContext();
+
+        if (!$viewContext->is_admin_or_staff || $viewContext->user_type !== 'admin') {
+            abort(403);
+        }
+
+        $fields = Field::all();
+
+        return view('Booking.admin.bulkSlotPrice', compact('fields'));
+    }
+
+    public function bulkSlotPriceUpdate(Request $request)
+    {
+        $viewContext = $this->getViewContext();
+
+        if (!$viewContext->is_admin_or_staff || $viewContext->user_type !== 'admin') {
+            abort(403);
+        }
+
+        $request->validate([
+            'fieldID'   => 'nullable|string',
+            'startDate' => 'required|date',
+            'endDate'   => 'required|date|after_or_equal:startDate',
+            'price'     => 'required|numeric|min:1|max:9999',
+        ]);
+
+        $query = Slot::whereBetween('slot_Date', [
+            $request->startDate,
+            $request->endDate
+        ]);
+
+        if ($request->filled('fieldID')) {
+            $query->where('fieldID', $request->fieldID);
+        }
+
+        $slots = $query->get();
+        $updatedCount = 0;
+
+        foreach ($slots as $slot) {
+            // Skip booked slots
+            if ($this->isSlotBooked($slot->slotID)) {
+                continue;
+            }
+
+            // Skip past slots
+            $slotDateTime = Carbon::parse(
+                $slot->slot_Date . ' ' . $slot->slot_Time,
+                'Asia/Kuala_Lumpur'
+            );
+
+            if ($slotDateTime->lt(now('Asia/Kuala_Lumpur'))) {
+                continue;
+            }
+
+            $slot->update([
+                'slot_Price' => $request->price,
+            ]);
+
+            $updatedCount++;
+        }
+
+        return redirect()
+            ->back()
+            ->with('success', "{$updatedCount} slot(s) updated successfully.");
+    }
+
+    public function manageSlotPrices($fieldID = null)
+{
+    $viewContext = $this->getViewContext();
+
+    // Admin only
+    if (!$viewContext->is_admin_or_staff || $viewContext->user_type !== 'admin') {
+        abort(403);
+    }
+
+    if (!$fieldID) {
+        $field = Field::firstOrFail();
+        $fieldID = $field->fieldID;
+    } else {
+        $field = Field::where('fieldID', $fieldID)->firstOrFail();
+    }
+
+    $allFields = Field::all();
+
+    return view('Booking.admin.manageSlotPrices', compact('field', 'allFields'));
+}
+
+public function updateSelectedSlotPrices(Request $request)
+{
+    $viewContext = $this->getViewContext();
+
+    // Admin only
+    if (!$viewContext->is_admin_or_staff || $viewContext->user_type !== 'admin') {
+        abort(403);
+    }
+
+    $request->validate([
+        'slot_ids' => 'required|array|min:1',
+        'slot_ids.*' => 'required|string',
+        'price' => 'required|numeric|min:1|max:9999',
+    ]);
+
+    $updated = 0;
+    $skipped = 0;
+
+    foreach ($request->slot_ids as $slotID) {
+        $slot = Slot::find($slotID);
+
+        if (!$slot) {
+            $skipped++;
+            continue;
+        }
+
+        // Skip booked slots
+        if ($this->isSlotBooked($slotID)) {
+            $skipped++;
+            continue;
+        }
+
+        // Skip past slots
+        $slotDateTime = Carbon::parse(
+            $slot->slot_Date . ' ' . $slot->slot_Time,
+            'Asia/Kuala_Lumpur'
+        );
+
+        if ($slotDateTime->lt(now('Asia/Kuala_Lumpur'))) {
+            $skipped++;
+            continue;
+        }
+
+        $slot->update([
+            'slot_Price' => $request->price,
+        ]);
+
+        $updated++;
+    }
+
+    return response()->json([
+        'message' => "Updated {$updated} slot(s). Skipped {$skipped} slot(s).",
+        'updated' => $updated,
+        'skipped' => $skipped,
+    ]);
+}
+
+
 }
