@@ -565,7 +565,7 @@ public function getBookingForecast()
 
 public function downloadPdf(Request $request)
 {
-    // 1️⃣ Validate incoming data (NO chart image anymore)
+    // 1) Validate incoming data (NO chart image anymore)
     $request->validate([
         'title'        => 'required|string',
         'report_type'  => 'required|string',
@@ -576,20 +576,27 @@ public function downloadPdf(Request $request)
         'insights'     => 'nullable|string',
     ]);
 
-    // 2️⃣ Decode JSON safely
+    // 2) Decode JSON safely
     $summaryData = json_decode($request->summary, true) ?? [];
     $meta        = json_decode($request->meta, true) ?? [];
     $labels      = json_decode($request->table_labels, true) ?? [];
     $values      = json_decode($request->table_values, true) ?? [];
     $insights    = json_decode($request->insights, true) ?? [];
 
-    // 3️⃣ Defensive check (avoid mismatched table data)
+    // 3) Defensive check (avoid mismatched table data)
     if (count($labels) !== count($values)) {
         abort(400, 'Invalid table data provided.');
     }
 
-    // 4️⃣ Generate PDF (NO images, NO GD required)
-    $pdf = Pdf::loadView('Report.admin.reportPdf', [
+    // 4) Decide which PDF view to use (admin vs staff)
+    //    (Based on your system session style used elsewhere)
+    $userType = session('user_type'); // 'administrator' or 'staff'
+    $pdfView  = ($userType === 'staff')
+        ? 'Report.staff.reportPdf'
+        : 'Report.admin.reportPdf';
+
+    // 5) Generate PDF (NO images, NO GD required)
+    $pdf = Pdf::loadView($pdfView, [
         'title'       => $request->title,
         'reportType'  => $request->report_type,
         'summaryData' => $summaryData,
@@ -600,14 +607,15 @@ public function downloadPdf(Request $request)
         'generatedAt' => Carbon::now('Asia/Kuala_Lumpur'),
     ])->setPaper('a4', 'portrait');
 
-    // 5️⃣ Clean & safe filename
+    // 6) Clean & safe filename
     $safeTitle = preg_replace('/[^A-Za-z0-9_\- ]/', '', $request->title);
     $safeTitle = trim(preg_replace('/\s+/', ' ', $safeTitle));
     $filename  = 'PadangPro_Report_' . str_replace(' ', '_', $safeTitle) . '.pdf';
 
-    // 6️⃣ Download
+    // 7) Download
     return $pdf->download($filename);
 }
+
 
 
 
